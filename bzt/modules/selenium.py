@@ -99,6 +99,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
 
     def __init__(self):
         super(SeleniumExecutor, self).__init__()
+        self.env = {}
         self.end_time = None
         self.runner = None
         self.script = None
