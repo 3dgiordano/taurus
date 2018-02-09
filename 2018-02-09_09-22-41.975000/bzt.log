@@ -1,0 +1,60 @@
+[2018-02-09 09:22:41,823 INFO root] Taurus CLI Tool v1.10.4.3dgiordano
+[2018-02-09 09:22:41,828 DEBUG root] Command-line options: {'verbose': None, 'no_system_configs': None, 'quiet': None, 'log': 'c:\\users\\usuario\\appdata\\local\\temp\\bzt_b7dkgb.log', 'option': None, 'aliases': []}
+[2018-02-09 09:22:41,828 DEBUG root] Python: CPython 2.7.12
+[2018-02-09 09:22:41,828 DEBUG root] OS: ('Windows', 'dg-nb-asus', '10', '10.0.16299', 'AMD64', 'Intel64 Family 6 Model 58 Stepping 9, GenuineIntel')
+[2018-02-09 09:22:41,828 INFO root] Starting with configs: []
+[2018-02-09 09:22:41,831 DEBUG root] Using personal config: C:\Users\usuario\.bzt-rc
+[2018-02-09 09:22:41,831 INFO Engine] Configuring...
+[2018-02-09 09:22:41,835 DEBUG Engine] Reading extension configs from: C:\etc\bzt.d
+[2018-02-09 09:22:41,835 DEBUG Engine] Base configs list: ['C:\\David\\Abstracta\\bz-functional\\taurus\\taurus\\bzt\\resources\\base-config.yml', 'C:\\etc\\bzt.d\\10-base.json', 'C:\\etc\\bzt.d\\99-installID.yml']
+[2018-02-09 09:22:41,835 DEBUG Engine.Configuration] Configs: ['C:\\David\\Abstracta\\bz-functional\\taurus\\taurus\\bzt\\resources\\base-config.yml', 'C:\\etc\\bzt.d\\10-base.json', 'C:\\etc\\bzt.d\\99-installID.yml']
+[2018-02-09 09:22:41,835 DEBUG Engine.Configuration] Reading C:\David\Abstracta\bz-functional\taurus\taurus\bzt\resources\base-config.yml as YAML
+[2018-02-09 09:22:41,897 DEBUG Engine.Configuration] Reading C:\etc\bzt.d\10-base.json as YAML
+[2018-02-09 09:22:41,940 DEBUG Engine.Configuration] Reading C:\etc\bzt.d\99-installID.yml as YAML
+[2018-02-09 09:22:41,940 DEBUG Engine] User configs list: ['C:\\Users\\usuario\\.bzt-rc']
+[2018-02-09 09:22:41,940 DEBUG Engine.Configuration] Configs: ['C:\\Users\\usuario\\.bzt-rc']
+[2018-02-09 09:22:41,960 DEBUG Engine.Configuration] Reading C:\Users\usuario\.bzt-rc as YAML
+[2018-02-09 09:22:41,967 DEBUG Engine.Configuration] Configs: ['C:\\Users\\usuario\\.bzt-rc']
+[2018-02-09 09:22:41,967 DEBUG Engine.Configuration] Reading C:\Users\usuario\.bzt-rc as YAML
+[2018-02-09 09:22:41,974 DEBUG Engine] Requesting updates info: http://gettaurus.org/updates/?version=1.10.4.3dgiordano&installID=8606e15591b
+[2018-02-09 09:22:41,974 INFO Engine] Artifacts dir: C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000
+[2018-02-09 09:22:41,980 DEBUG Engine] New artifact filename: C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000\effective
+[2018-02-09 09:22:41,986 DEBUG Engine.Configuration] Dumping YAML config into C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000\effective.yml
+[2018-02-09 09:22:42,040 DEBUG Engine.Configuration] Dumping JSON config into C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000\effective.json
+[2018-02-09 09:22:42,042 DEBUG root] Closing log handler: c:\users\usuario\appdata\local\temp\bzt_b7dkgb.log
+[2018-02-09 09:22:42,049 DEBUG root] Switched writing logs to C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000\bzt.log
+[2018-02-09 09:22:42,049 DEBUG root] Linting config
+[2018-02-09 09:22:42,053 INFO Engine] Preparing...
+[2018-02-09 09:22:42,056 DEBUG Engine] Module config: consolidator defaultdict(None, {'ignore-labels': ['ignore'], 'percentiles': [0.0, 50.0, 90.0, 95.0, 99.0, 99.9, 100.0], 'class': 'bzt.modules.aggregator.ConsolidatingAggregator'})
+[2018-02-09 09:22:42,058 DEBUG root] Importing module: bzt.modules.aggregator
+[2018-02-09 09:22:42,394 DEBUG root] Loading class: 'ConsolidatingAggregator' from <module 'bzt.modules.aggregator' from 'C:\David\Abstracta\bz-functional\taurus\taurus\bzt\modules\aggregator.py'>
+[2018-02-09 09:22:42,394 DEBUG Engine.consolidator] Buffer scaling setup: percentile 95.0 from [0.0, 50.0, 90.0, 95.0, 99.0, 99.9, 100.0] selected
+[2018-02-09 09:22:42,394 DEBUG Engine] Module config: monitoring defaultdict(None, {'class': 'bzt.modules.monitoring.Monitoring'})
+[2018-02-09 09:22:42,394 DEBUG root] Importing module: bzt.modules.monitoring
+[2018-02-09 09:22:42,426 DEBUG root] Loading class: 'Monitoring' from <module 'bzt.modules.monitoring' from 'C:\David\Abstracta\bz-functional\taurus\taurus\bzt\modules\monitoring.py'>
+[2018-02-09 09:22:42,426 WARNING Engine] Module 'monitoring' can be only used once, will merge all new instances into single
+[2018-02-09 09:22:42,430 WARNING Engine.monitoring] LocalMonitoring client found twice, configs will be joined
+[2018-02-09 09:22:42,434 DEBUG Engine] Module config: local defaultdict(None, {'class': 'bzt.modules.provisioning.Local'})
+[2018-02-09 09:22:42,434 DEBUG root] Importing module: bzt.modules.provisioning
+[2018-02-09 09:22:42,434 DEBUG root] Loading class: 'Local' from <module 'bzt.modules.provisioning' from 'C:\David\Abstracta\bz-functional\taurus\taurus\bzt\modules\provisioning.py'>
+[2018-02-09 09:22:42,434 ERROR root] Config Error: No 'execution' is configured. Did you forget to pass config files?
+[2018-02-09 09:22:42,444 DEBUG root] TaurusConfigError: No 'execution' is configured. Did you forget to pass config files?
+Traceback (most recent call last):
+  File "C:\David\Abstracta\bz-functional\taurus\taurus\bzt\cli.py", line 262, in perform
+    self.engine.prepare()
+  File "C:\David\Abstracta\bz-functional\taurus\taurus\bzt\engine.py", line 166, in prepare
+    self.__prepare_provisioning()
+  File "C:\David\Abstracta\bz-functional\taurus\taurus\bzt\engine.py", line 513, in __prepare_provisioning
+    self.provisioning.prepare()
+  File "C:\David\Abstracta\bz-functional\taurus\taurus\bzt\modules\provisioning.py", line 68, in prepare
+    super(Local, self).prepare()
+  File "C:\David\Abstracta\bz-functional\taurus\taurus\bzt\engine.py", line 873, in prepare
+    raise exc
+TaurusConfigError: No 'execution' is configured. Did you forget to pass config files?
+[2018-02-09 09:22:42,444 INFO Engine] Post-processing...
+[2018-02-09 09:22:42,447 DEBUG Engine.consolidator] Consolidator buffer[0]: []
+[2018-02-09 09:22:42,453 DEBUG Engine.Configuration] Dumping YAML config into C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000\effective.yml
+[2018-02-09 09:22:42,510 DEBUG Engine.Configuration] Dumping JSON config into C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000\effective.json
+[2018-02-09 09:22:42,515 INFO root] Artifacts dir: C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000
+[2018-02-09 09:22:42,517 WARNING root] Done performing with code: 1
+[2018-02-09 09:22:42,519 DEBUG root] Closing log handler: C:\David\Abstracta\bz-functional\taurus\taurus\2018-02-09_09-22-41.975000\bzt.log
