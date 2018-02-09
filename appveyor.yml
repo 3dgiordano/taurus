@@ -41,4 +41,5 @@ after_test:
   - ps: (gci env:*).GetEnumerator() | Sort-Object Name | Out-String
   - "coverage report -m"
   - "codecov"
+  - ps: Write-Host "HTTPServer exit code: " + $HTTPServer.ExitCode
   - ps: Stop-Process -Id $HTTPServer.Id
