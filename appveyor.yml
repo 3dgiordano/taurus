@@ -38,6 +38,7 @@ test_script:
       --exclude-dir=tests/ci --with-coverage --cover-inclusive"
 
 after_test:
+  - ps: (gci env:*).GetEnumerator() | Sort-Object Name | Out-String
   - "coverage report -m"
   - "codecov"
   - ps: Stop-Process -Id $HTTPServer.Id
