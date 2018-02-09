@@ -80,11 +80,10 @@ class TestJMeterExecutor(BZTestCase):
         elif prov == 'cloud':
             self.obj.engine.provisioning = CloudProvisioning()
         else:
-            raise ('Wrong provisioning value: %s' % prov)
+            self.fail('Wrong provisioning value: %s' % prov)
 
     def test_jmx(self):
         self.obj.execution.merge({"scenario": {"script": RESOURCES_DIR + "/jmeter/jmx/dummy.jmx"}})
-        self.obj.engine.create_artifacts_dir()
         self.obj.prepare()
 
     def test_jmx_with_props(self):
@@ -92,7 +91,6 @@ class TestJMeterExecutor(BZTestCase):
             "concurrency": 10,
             "scenario": {"script": RESOURCES_DIR + "/jmeter/jmx/props_tg.jmx"}
         })
-        self.obj.engine.create_artifacts_dir()
         self.obj.prepare()
 
     def test_jmx_2tg(self):
@@ -100,7 +98,12 @@ class TestJMeterExecutor(BZTestCase):
             "concurrency": 1051,
             "ramp-up": 15,
             "iterations": 100,
-            "scenario": {"script": RESOURCES_DIR + "/jmeter/jmx/two_tg.jmx"}
+            "scenario": {
+                "script": RESOURCES_DIR + "/jmeter/jmx/two_tg.jmx",
+                "modifications": {
+                    "disable": ["should_disable"]
+                }
+            }
         })
         self.obj.prepare()
         jmx = JMX(self.obj.modified_jmx)
@@ -984,7 +987,7 @@ class TestJMeterExecutor(BZTestCase):
         self.sniff_log(self.obj.log)
         self.obj.execution.merge({"scenario": {"script": RESOURCES_DIR + "/jmeter/jmx/dummy.jmx"}})
         self.obj.prepare()
-        self.obj._env['TEST_MODE'] = 'server'
+        self.obj.env.set({'TEST_MODE': 'server'})
         self.obj.startup()
         time.sleep(1)
         self.obj.management_port = 8089
@@ -1359,7 +1362,7 @@ class TestJMeterExecutor(BZTestCase):
                 'jmeter': {
                     'memory-xmx': '2G'}}})
         self.obj.prepare()
-        self.obj._env['TEST_MODE'] = 'heap'
+        self.obj.env.set({'TEST_MODE': 'heap'})
         self.obj.startup()
         self.obj.shutdown()
         self.obj.post_process()
@@ -1924,10 +1927,10 @@ class TestJMeterExecutor(BZTestCase):
                         "url": "http://blazedemo.com/",
                         "method": "POST",
                         "upload-files": [{
-                            "path": "${some_var}",      # variable
+                            "path": "${some_var}",  # variable
                             "param": "stats",
                         }, {
-                            "path": "body-file.dat",     # relpath from RES_DIR/jmeter
+                            "path": "body-file.dat",  # relpath from RES_DIR/jmeter
                             "param": "report",
                         }, {
                             "path": os.path.join(RESOURCES_DIR, 'jmeter', 'unicode-file'),  # abs path
@@ -2397,13 +2400,9 @@ class TestJMeterExecutor(BZTestCase):
                 "iterations": 1,
                 "scenario": {
                     "requests": [{
-                        "url": "http://blazedemo.com/",
-                    }]
-                }
-            }
-        })
+                        "url": "http://blazedemo.com/"}]}}})
         self.obj.prepare()
-        self.obj._env['TEST_MODE'] = 'log'
+        self.obj.env.set({'TEST_MODE': 'log'})
         self.obj.startup()
         while not self.obj.check():
             time.sleep(1)

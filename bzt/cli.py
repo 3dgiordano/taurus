@@ -14,6 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+import copy
 import logging
 import os
 import platform
@@ -38,6 +39,7 @@ from bzt import TaurusInternalException, TaurusConfigError, TaurusNetworkError
 from bzt.engine import Engine, Configuration, ScenarioExecutor
 from bzt.engine import SETTINGS
 from bzt.commands import Commands
+from bzt.linter import ConfigurationLinter
 from bzt.six import HTTPError, string_types, get_stacktrace
 from bzt.utils import run_once, is_int, BetterDict, get_full_path, is_url
 
@@ -49,6 +51,8 @@ class CLI(object):
     :param options: OptionParser parsed parameters
     """
     console_handler = logging.StreamHandler(sys.stdout)
+
+    CLI_SETTINGS = "cli"
 
     def __init__(self, options, from_command=False):
         self.signal_count = 0
@@ -196,6 +200,25 @@ class CLI(object):
         self.engine.create_artifacts_dir(configs, merged_config)
         self.engine.default_cwd = os.getcwd()
 
+    def __lint_config(self):
+        settings = self.engine.config.get(CLI.CLI_SETTINGS).get("linter")
+        self.log.debug("Linting config")
+        self.warn_on_unfamiliar_fields = settings.get("warn-on-unfamiliar-fields", True)
+        config_copy = copy.deepcopy(self.engine.config)
+        ignored_warnings = settings.get("ignored-warnings", [])
+        self.linter = ConfigurationLinter(config_copy, ignored_warnings, self.log)
+        self.linter.register_checkers()
+        self.linter.lint()
+        warnings = self.linter.get_warnings()
+        for warning in warnings:
+            self.log.warning(str(warning))
+
+        if settings.get("lint-and-exit", False):
+            if warnings:
+                raise TaurusConfigError("Errors were found in the configuration")
+            else:
+                raise NormalShutdown("Linting has finished, no errors were found")
+
     def _level_down_logging(self):
         self.log.debug("Leveling down log file verbosity, use -v option to have DEBUG messages enabled")
         for handler in self.log.handlers:
@@ -231,8 +254,10 @@ class CLI(object):
                     self.engine.logging_level_down = self._level_down_logging
                     self.engine.logging_level_up = self._level_up_logging
 
+
                 self.__configure(configs)
                 self.__move_log_to_artifacts()
+                self.__lint_config()
 
                 self.engine.prepare()
                 self.engine.run()

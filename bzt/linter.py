@@ -1,10 +1,6 @@
-import copy
 import traceback
 
-from bzt import NormalShutdown, TaurusConfigError
-from bzt.engine import Service, Singletone
 from bzt.six import iteritems, text_type, string_types
-from bzt.utils import load_class
 
 
 def dameraulevenshtein(seq1, seq2):
@@ -42,38 +38,6 @@ def dameraulevenshtein(seq1, seq2):
 
 def most_similar_string(key, variants):
     return min([(dameraulevenshtein(key, v), v) for v in variants], key=lambda dv: dv[0])
-
-
-class LinterService(Service, Singletone):
-    def __init__(self):
-        super(LinterService, self).__init__()
-        self.warn_on_unfamiliar_fields = True
-        self.linter = None
-
-    def _get_conf_option(self, key, default=None):
-        return self.parameters.get(key, self.settings.get(key, default))
-
-    def prepare(self):
-        if self.settings.get("disable", False):
-            return
-        self.log.info("Linting config")
-        self.warn_on_unfamiliar_fields = self._get_conf_option("warn-on-unfamiliar-fields", True)
-        config_copy = copy.deepcopy(self.engine.config)
-        checkers_repo = self.settings.get("checkers")
-        checkers_enabled = self.settings.get("checkers-enabled", [])
-        ignored_warnings = self.settings.get("ignore-warnings", [])
-        self.linter = ConfigurationLinter(config_copy, ignored_warnings, self.log)
-        self.linter.register_checkers(checkers_repo, checkers_enabled)
-        self.linter.lint()
-        warnings = self.linter.get_warnings()
-        for warning in warnings:
-            self.log.warning(str(warning))
-
-        if self._get_conf_option("lint-and-exit", False):
-            if warnings:
-                raise TaurusConfigError("There were a few errors found in the configuration.")
-            else:
-                raise NormalShutdown("Linting finished. No errors found.")
 
 
 class Path(object):
@@ -127,7 +91,11 @@ class Path(object):
 
 
 class ConfigWarning(object):
-    def __init__(self, identifier, path, message):
+    ERROR = "Error"
+    WARNING = "Warning"
+
+    def __init__(self, severity, identifier, path, message):
+        self.severity = severity
         self.identifier = identifier
         self.path = path
         self.message = message
@@ -150,15 +118,13 @@ class ConfigurationLinter(object):
         self._checkers = []
         self._ignored_warnings = ignored_warnings
 
-    def register_checkers(self, checkers_repo, checkers_enabled):
-        for checker_name in checkers_enabled:
-            checker_fqn = checkers_repo.get(checker_name)
-            if not checker_fqn:
-                raise TaurusConfigError("Checker %r not found" % checker_name)
-            checker_class = load_class(checker_fqn)
-            assert issubclass(checker_class, Checker)
-            checker = checker_class(self)
-            self._checkers.append(checker)
+    def register_checkers(self):
+        self._checkers = [
+            ExecutionChecker(self),
+            ToplevelChecker(self),
+            ScenarioChecker(self),
+            JMeterScenarioChecker(self),
+        ]
 
     def subscribe(self, path, sub):
         if path in self._subscriptions:
@@ -175,7 +141,6 @@ class ConfigurationLinter(object):
             if sub_path.matches(concrete_path):
                 for fun in sub_funs:
                     try:
-                        self.log.debug("Launching func %s at %s", fun, value)
                         fun(concrete_path, value)
                     except BaseException:
                         self.log.warning("Checker failed: %s", traceback.format_exc())
@@ -203,7 +168,6 @@ class ConfigurationLinter(object):
         return self._warnings
 
     def visit(self, path, value):
-        self.log.debug("Visiting value at %s", path)
         self.run_subscribers(path, value)
         if isinstance(value, dict):
             self.visit_dict(path, value)
@@ -237,10 +201,13 @@ class Checker(object):
         edits, suggestion = most_similar_string(key, variants)
         # NOTE: or should it be a list of suggestions?
         if edits <= 3:
-            self.report('possible-typo', cpath, "unfamiliar name %r. Did you mean %r?" % (key, suggestion))
+            key_path = cpath.copy()
+            key_path.add_component(key)
+            self.report(ConfigWarning.WARNING, 'possible-typo', key_path,
+                        "unfamiliar name %r. Did you mean %r?" % (key, suggestion))
 
-    def report(self, warning_id, cpath, message):
-        self.linter.report_warning(ConfigWarning(warning_id, cpath, message))
+    def report(self, severity, warning_id, cpath, message):
+        self.linter.report_warning(ConfigWarning(severity, warning_id, cpath, message))
 
 
 class ExecutionChecker(Checker):
@@ -256,10 +223,10 @@ class ExecutionChecker(Checker):
                 self.on_execution_item(path, item)
         else:
             if isinstance(value, dict):
-                self.report('single-execution', cpath, "'execution' should be a list")
+                self.report(ConfigWarning.WARNING, 'single-execution', cpath, "'execution' should be a list")
                 self.on_execution_item(cpath, value)
             else:
-                self.report('execution-non-list', cpath, "'execution' should be a list")
+                self.report(ConfigWarning.ERROR, 'execution-non-list', cpath, "'execution' should be a list")
 
     def on_execution_item(self, cpath, execution):
         known_fields = [
@@ -268,7 +235,7 @@ class ExecutionChecker(Checker):
         if not isinstance(execution, dict):
             return
         if "scenario" not in execution:
-            self.report('no-scenario', cpath, "execution item doesn't specify scenario")
+            self.report(ConfigWarning.ERROR, 'no-scenario', cpath, "execution item doesn't specify scenario")
         for field in execution:
             if field not in known_fields:
                 self.check_for_typos(cpath, field, known_fields)
@@ -277,8 +244,10 @@ class ExecutionChecker(Checker):
 
 class ToplevelChecker(Checker):
     KNOWN_TOPLEVEL_SECTIONS = [
-        "cli-aliases", "execution", "install-id", "modules", "provisioning", "reporting", "scenarios",
+        "cli", "cli-aliases", "execution", "install-id", "modules", "provisioning", "reporting", "scenarios",
         "settings", "services", "version",
+        "locations", "locations-weighted",  # v2 cloud tests only
+        "included-configs",
     ]
 
     def __init__(self, linter):
@@ -303,7 +272,7 @@ class ScenarioChecker(Checker):
         if isinstance(scenario, dict):
             self.check_scenario(cpath, scenario)
         else:
-            self.report('scenario-non-dict', cpath, "scenario is not a dict")
+            self.report(ConfigWarning.ERROR, 'scenario-non-dict', cpath, "scenario is not a dict")
 
     def on_execution_scenario(self, cpath, scenario):
         if isinstance(scenario, dict):
@@ -313,13 +282,16 @@ class ScenarioChecker(Checker):
             scenario_path = Path("scenarios", scenario_name)
             scenario = self.linter.get_config_value(scenario_path, raise_if_not_found=False)
             if not scenario:
-                self.report('undefined-scenario', cpath, "scenario %r is used but isn't defined" % scenario_name)
+                self.report(ConfigWarning.ERROR, 'undefined-scenario', cpath,
+                            "scenario %r is used but isn't defined" % scenario_name)
 
     def check_scenario(self, cpath, scenario):
         if "script" not in scenario and "requests" not in scenario:
-            self.report('no-script-or-requests', cpath, "scenario doesn't define neither 'script' nor 'requests'")
+            self.report(ConfigWarning.ERROR, 'no-script-or-requests', cpath,
+                        "scenario doesn't define neither 'script' nor 'requests'")
         elif "script" in scenario and "requests" in scenario:
-            self.report('script-and-requests', cpath, "scenario defines both 'script' and 'requests'")
+            self.report(ConfigWarning.WARNING, 'script-and-requests', cpath,
+                        "scenario defines both 'script' and 'requests'")
 
 
 class JMeterScenarioChecker(Checker):
