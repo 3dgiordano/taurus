@@ -99,7 +99,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
 
     def __init__(self):
         super(SeleniumExecutor, self).__init__()
-        self.env = Environment(self.log)
+        self.env = None
         self.end_time = None
         self.runner = None
         self.script = None
@@ -118,6 +118,9 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         return self.runner_working_dir
 
     def create_runner(self):
+        if self.env is None:
+            self.env = Environment(self.log, self.engine.env.get())   # for backward compatibility with taurus-server
+
         runner_type = self.get_runner_type()
         self.runner = self.engine.instantiate_module(runner_type)
         self.runner.env = self.env
