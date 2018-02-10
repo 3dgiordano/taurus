@@ -16,7 +16,6 @@ platform:
   - x64
 
 install:
-  - choco install codecov
   - choco install firefox --version 57.0.4
   - ps: Install-Product node $env:NODEJS_VERSION
   - "%PYTHON%\\python.exe -m pip install pip --upgrade"
@@ -41,6 +40,5 @@ test_script:
 after_test:
   - ps: (gci env:*).GetEnumerator() | Sort-Object Name | Out-String
   - "coverage report -m"
-  - C:\ProgramData\chocolatey\lib\codecov\tools\Codecov\codecov.exe
-  - ps: 'Write-Host "HTTPServer exit code: " + $HTTPServer.ExitCode'
-  - ps: Stop-Process -Id $HTTPServer.Id
+  - "codecov"
+#  - ps: Stop-Process -Id $HTTPServer.Id
