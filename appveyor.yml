@@ -41,6 +41,6 @@ test_script:
 after_test:
   - ps: (gci env:*).GetEnumerator() | Sort-Object Name | Out-String
   - "coverage report -m"
-  - C:\ProgramData\chocolatey\lib\codecov\tools\codecov.exe
+  - C:\ProgramData\chocolatey\lib\codecov\tools\Codecov\codecov.exe
   - ps: 'Write-Host "HTTPServer exit code: " + $HTTPServer.ExitCode'
   - ps: Stop-Process -Id $HTTPServer.Id
