@@ -123,6 +123,8 @@ Sample Mobile (Appium) scenario:
 scenarios:
   request_example:
     browser: Android-Chrome
+    capabilities:
+      - device: id_device # set the id of the device here (device devices)
     # remote: custom_appium_url # You can specify a custom url 
     timeout: 10  #  global scenario timeout for connecting, receiving results, 30 seconds by default
     think-time: 1s500ms  # global scenario delay between each request
