@@ -117,7 +117,7 @@ scenarios:
         not: false  # inverse assertion condition
 ```
 
-Sample Mobile (Appium local) scenario:
+Sample Mobile (Appium) scenario:
 ```yaml
 scenarios:
   request_example:
