@@ -20,9 +20,8 @@ import shlex
 import sys
 import time
 from abc import abstractmethod
-from collections import OrderedDict
+from collections import defaultdict, OrderedDict
 from subprocess import CalledProcessError
-
 import astunparse
 import yaml
 
@@ -327,7 +326,8 @@ import apiritif
         self.log.debug("Generating setUp test method")
         browsers = ["Firefox", "Chrome", "Ie", "Opera", "Remote", "Android", "iOS"]
 
-        browser = self.scenario.get_noset("browser", self.execution.get_noset("browser", None))
+        #browser = self.scenario.get_noset("browser", self.execution.get_noset("browser", None))
+        browser = defaultdict(self.scenario).get("browser", defaultdict(self.execution).get("browser", None))
         # Split platform: Browser
 
         if browser:
@@ -338,7 +338,8 @@ import apiritif
 
         setup_method_def = self.gen_method_definition("setUp", ["self"])
 
-        remote_executor = self.scenario.get_noset("remote", self.execution.get_noset("remote", None))
+        # remote_executor = self.scenario.get_noset("remote", self.execution.get_noset("remote", None))
+        remote_executor = defaultdict(self.scenario).get("remote", defaultdict(self.execution).get("remote", None))
         self.log.info("Exec Remote:" + str(remote_executor))
 
         if not browser and remote_executor:
@@ -371,7 +372,8 @@ import apiritif
             setup_method_def.append(self.gen_statement(statement % repr(self.wdlog)))
         elif browser == 'Remote':
 
-            remote_capabilities = self.scenario.get_noset("capabilities", self.execution.get_noset("capabilities", {}))
+            # remote_capabilities = self.scenario.get_noset("capabilities", self.execution.get_noset("capabilities", {}))
+            remote_capabilities = defaultdict(self.scenario).get("capabilities", defaultdict(self.execution).get("capabilities", {}))
             self.log.info(remote_capabilities)
             remote_capabilities = remote_capabilities + inherited_capabilities
 
