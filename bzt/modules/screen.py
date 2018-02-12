@@ -18,6 +18,7 @@ limitations under the License.
 import logging
 import math
 import os
+
 import urwid
 from urwid import BaseScreen
 
