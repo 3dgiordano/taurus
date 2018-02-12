@@ -157,12 +157,13 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         self.log.info("Remote:" + str(self.runner.execution["remote"]))
         self.log.info("Capabilities:" + str(len(self.runner.execution["capabilities"])))
 
-        if "remote" in self.runner.execution:
-            self.add_env({"BZT_REMOTE": self.runner.execution["remote"]})
-        if "capabilities" in self.runner.execution:
-            for remote_cap in self.runner.execution["capabilities"]:
-                if "browser" in remote_cap:
-                    self.add_env({"BZT_REMOTE_BROWSER": remote_cap["browser"]})
+        if self.env:
+            if "remote" in self.runner.execution:
+                self.add_env({"BZT_REMOTE": self.runner.execution["remote"]})
+            if "capabilities" in self.runner.execution:
+                for remote_cap in self.runner.execution["capabilities"]:
+                    if "browser" in remote_cap:
+                        self.add_env({"BZT_REMOTE_BROWSER": remote_cap["browser"]})
 
         self.runner.execution['files'] = self.execution.get('files', [])
         self.runner.execution['executor'] = runner_type
