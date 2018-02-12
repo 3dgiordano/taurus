@@ -230,15 +230,15 @@ import apiritif
         self.wdlog = wdlog
         self.execution = None
         self.settings = None
+        self.appium = False
 
     def build_source_code(self, execution=None, settings=None):
         self.log.debug("Generating Test Case test methods")
         self.execution = execution
         self.settings = settings
         imports = self.add_imports()
-        self.root.append(imports)
+
         test_class = self.gen_class_definition("TestRequests", ["unittest.TestCase"])
-        self.root.append(test_class)
         test_class.append(self.gen_setup_method())
         test_class.append(self.gen_teardown_method())
 
@@ -296,6 +296,12 @@ import apiritif
 
         test_class.append(test_method)
 
+        if self.appium:
+            imports.text = imports.text.replace("from selenium import webdriver", "from appium import webdriver")
+
+        self.root.append(imports)
+        self.root.append(test_class)
+
     def _add_url_request(self, default_address, req, test_method):
         parsed_url = parse.urlparse(req.url)
         if default_address is not None and not parsed_url.netloc:
@@ -316,11 +322,15 @@ import apiritif
 
     def gen_setup_method(self):
         desire_capabilities = {}
+        inherited_capabilities = []
 
         self.log.debug("Generating setUp test method")
-        browsers = ["Firefox", "Chrome", "Ie", "Opera", "Remote"]
+        browsers = ["Firefox", "Chrome", "Ie", "Opera", "Remote", "Android", "iOS"]
 
         browser = self.scenario.get_noset("browser", self.execution.get_noset("browser", None))
+        # Split platform: Browser
+        browser_split = browser.split("-")
+        browser = browser_split[0]
         if browser and (browser not in browsers):
             raise TaurusConfigError("Unsupported browser name: %s" % browser)
 
@@ -331,11 +341,22 @@ import apiritif
 
         if not browser and remote_executor:
             browser = "Remote"
+        elif browser and browser in ["Android", "iOS"]:
+            self.appium = True
+            inherited_capabilities.append({"platform": browser})
+            browser = "Remote"
+            if len(browser_split) > 1 and browser_split[1] in ["Chrome", "Safari"]:
+                inherited_capabilities.append({"browser": browser_split[1]})
+
+            else: # Native
+                inherited_capabilities.append({"browser": ""})
         elif not browser:
             browser = "Firefox"
 
-        if browser == "Remote" and not remote_executor:
+        if not self.appium and browser == "Remote" and not remote_executor:
             remote_executor = "http://localhost:4444/wd/hub"
+        elif self.appium and not remote_executor:
+            remote_executor = "http://localhost:4723/wd/hub"
 
         if browser == 'Firefox':
             setup_method_def.append(self.gen_statement("profile = webdriver.FirefoxProfile()"))
@@ -349,8 +370,11 @@ import apiritif
         elif browser == 'Remote':
 
             remote_capabilities = self.scenario.get_noset("capabilities", self.execution.get_noset("capabilities", {}))
+            self.log.info(remote_capabilities)
+            remote_capabilities = remote_capabilities + inherited_capabilities
 
-            supported_capabilities = ["browser", "version", "javascript", "platform", "selenium"]
+            supported_capabilities = ["browser", "version", "javascript", "platform", "os_version",
+                                      "selenium", "device", "app"]
             for capability in remote_capabilities:
                 for cap_key in capability.keys():
                     if cap_key not in supported_capabilities:
@@ -362,9 +386,14 @@ import apiritif
                             desire_capabilities["version"] = str(capability[cap_key])
                         elif cap_key == "selenium":
                             desire_capabilities["seleniumVersion"] = str(capability[cap_key])
-                            desire_capabilities["browserstack.selenium_version"] = str(capability[cap_key])
                         elif cap_key == "javascript":
                             desire_capabilities["javascriptEnabled"] = capability[cap_key]
+                        elif cap_key == "platform":
+                            desire_capabilities["platformName"] = str(capability[cap_key])
+                        elif cap_key == "os_version":
+                            desire_capabilities["platformVersion"] = str(capability[cap_key])
+                        elif cap_key == "device":
+                            desire_capabilities["deviceName"] = str(capability[cap_key])
                         else:
                             desire_capabilities[cap_key] = capability[cap_key]
 
@@ -955,7 +984,7 @@ log.setLevel(logging.DEBUG)
 
     def build_source_code(self, execution=None, settings=None):
         self.execution = execution
-        self.settings=settings
+        self.settings = settings
         self.tree = self.build_tree()
 
     def save(self, filename):
