@@ -329,8 +329,10 @@ import apiritif
 
         browser = self.scenario.get_noset("browser", self.execution.get_noset("browser", None))
         # Split platform: Browser
-        browser_split = browser.split("-")
-        browser = browser_split[0]
+
+        if browser:
+            browser_split = browser.split("-")
+            browser = browser_split[0]
         if browser and (browser not in browsers):
             raise TaurusConfigError("Unsupported browser name: %s" % browser)
 
