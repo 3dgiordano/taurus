@@ -59,7 +59,7 @@ Action names are built as `<action>By<selector type>(<selector>)`. Sometimes act
   for visibility rather than presence (like `waitByName(elmName): visible`)
   - `clickByID`, `clickByName`, `clickByLinkText`, `clickByCSS` and `clickByXPath` - no parameter, just click on object
   - `keysByID`, `keysByName`, `keysByLinkText`, `keysByCSS` and `keysByXPath` - to enter keys into input items, requires parameter.
-  Like this: `keysByName(MyFormInputName): Value To Enter`
+  Like this: `keysByName(MyFormInputName): Value To Enter`. Special keys are allowed using the prefix `KEY_` . Like this: `keysByName(MyFormInputName): KEY_ENTER`.  See some of the possible values supported [here](http://selenium-python.readthedocs.io/api.html#module-selenium.webdriver.common.keys)
 
 There is special action `pauseFor(<time>)` which makes script to sleep for specified amount of time. Also, calling action `clearCookies()` will force `delete_all_cookies` method to be called on WebDriver object.
 
