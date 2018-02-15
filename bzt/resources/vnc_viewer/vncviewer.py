@@ -8,9 +8,6 @@ MIT License
 """
 
 # twisted modules
-from twisted.internet import _sslverify
-_sslverify.platformTrust = lambda: None  # Monkey patch
-
 from twisted.python import usage, log
 from twisted.internet import reactor, protocol
 # ~ from twisted.internet import defer
