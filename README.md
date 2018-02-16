@@ -87,7 +87,7 @@ Verify the version
 ```bash
 bzt -h
 ...
-BlazeMeter Taurus Tool v1.10.4.3dgiordano, the configuration-driven test
+BlazeMeter Taurus Tool v1.10.5.3dgiordano, the configuration-driven test
 running engine
 ...
 ```
