@@ -501,7 +501,7 @@ import apiritif
                 action = "send_keys(%r)" % param
                 if isinstance(param, str) and param.startswith("KEY_"):
                     action = "send_keys(Keys.%s)" % param.split("KEY_")[1]
-            elif action_chains.has_key(atype):
+            elif atype in action_chains:
                 tpl = "self.driver.find_element(By.%s, %r)"
                 action = action_chains[atype]
                 return self.gen_statement(
