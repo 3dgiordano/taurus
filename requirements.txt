@@ -17,4 +17,5 @@ Appium-Python-Client
 terminaltables>=3.1.0
 urwid
 twisted>=17.9.0
+service_identity>=17.0.0
 pygame>=1.9.3
