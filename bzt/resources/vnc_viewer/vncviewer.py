@@ -12,6 +12,8 @@ from twisted.python import usage, log
 from twisted.internet import reactor, protocol
 # ~ from twisted.internet import defer
 import os
+import socket
+
 # import pygame stuff
 import pygame
 from pygame.locals import *
@@ -283,6 +285,8 @@ class RFBToGUI(rfb.RFBClient):
         self.setPixelFormat()  # set up pixel format to 32 bits
         self.framebufferUpdateRequest()  # request initial screen update
 
+
+
     def vncRequestPassword(self):
         if self.factory.password is not None:
             self.sendPassword(self.factory.password)
@@ -443,7 +447,7 @@ class VncViewer(object):
             VNCFactory(
                 remoteframebuffer,  # the application/display
                 depth,  # color depth
-                False,  # if a fast connection is used
+                True,  # if a fast connection is used
                 conn_id ,
                 password,  # password or none
                 1,  # shared session flag
