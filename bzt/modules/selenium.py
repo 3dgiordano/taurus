@@ -29,7 +29,8 @@ from bzt.utils import is_windows, is_mac, platform_bitness, Environment
 
 from bzt.commands import Commands
 from bzt.resources.vnc_viewer.vncviewer import VncViewer
-from multiprocessing import Process
+from multiprocessing import Process, set_start_method
+set_start_method('spawn', force=True)
 
 class AbstractSeleniumExecutor(ReportableExecutor):
     @abstractmethod
@@ -41,7 +42,7 @@ class AbstractSeleniumExecutor(ReportableExecutor):
         pass
 
     @abstractmethod
-    def add_env(self, env):     # compatibility with taurus-server
+    def add_env(self, env):  # compatibility with taurus-server
         """
         Add environment variables into selenium process env
         :type env: dict[str,str]
@@ -108,7 +109,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
 
         self.vnc_connections = []
 
-    def add_env(self, env):     # compatibility with taurus-server
+    def add_env(self, env):  # compatibility with taurus-server
         self.env.set(env)
 
     def get_runner_working_dir(self):
@@ -138,8 +139,9 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
                 vnc_host = service_info["vnc"].split(":")[0]
                 vnc_port = int(service_info["vnc"].split(":")[1])
                 vnc_pass = "secret"
+
                 vnc_proc = Process(target=run_vncviewer, args=(vnc_host, vnc_port, vnc_pass,
-                                                               service_info["service_id"],))
+                                                                service_info["service_id"],))
                 vnc_proc.daemon = True
                 vnc_proc.start()
                 self.vnc_connections.append(vnc_proc)
@@ -173,7 +175,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             self.runner.execution["test-mode"] = "selenium"
 
     def get_virtual_display(self):
-        pass    # for compatibility with taurus server
+        pass  # for compatibility with taurus server
 
     def _get_chromedriver_link(self):
         settings = self.settings.get('chromedriver')
@@ -232,7 +234,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
 
     def prepare(self):
         if self.env is None:
-            self.env = Environment(self.log, self.engine.env.get())   # for backward compatibility with taurus-server
+            self.env = Environment(self.log, self.engine.env.get())  # for backward compatibility with taurus-server
 
         self.install_required_tools()
         for driver in self.webdrivers:
@@ -462,3 +464,4 @@ class GeckoDriver(RequiredTool):
             raise ToolError("Unable to find %s after installation!" % self.tool_name)
 
         # TODO: check for compatible browser versions?
+
