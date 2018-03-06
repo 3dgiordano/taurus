@@ -95,7 +95,7 @@ class Remote(object):
                 }
             )
 
-        attach_ids = map(_attach_service, remote_service)
+        attach_ids = list(map(_attach_service, remote_service))
 
         return attach_ids
 
