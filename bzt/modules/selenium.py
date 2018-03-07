@@ -33,7 +33,7 @@ from multiprocessing import Process
 import multiprocessing as mp
 try:
     mp.set_start_method('spawn', force=True)
-except ImportError:
+except AttributeError:
     pass
 
 
