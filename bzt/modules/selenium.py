@@ -29,8 +29,13 @@ from bzt.utils import is_windows, is_mac, platform_bitness, Environment
 
 from bzt.commands import Commands
 from bzt.resources.vnc_viewer.vncviewer import VncViewer
-from multiprocessing import Process, set_start_method
-set_start_method('spawn', force=True)
+from multiprocessing import Process
+import multiprocessing as mp
+try:
+    mp.set_start_method('spawn', force=True)
+except ImportError:
+    pass
+
 
 class AbstractSeleniumExecutor(ReportableExecutor):
     @abstractmethod
