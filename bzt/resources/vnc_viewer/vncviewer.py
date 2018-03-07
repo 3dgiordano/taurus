@@ -9,7 +9,7 @@ MIT License
 
 # twisted modules
 from twisted.python import usage, log
-from twisted.internet import reactor, protocol
+from twisted.internet import reactor, error, protocol
 # ~ from twisted.internet import defer
 import os
 import socket
@@ -404,11 +404,17 @@ class VNCFactory(rfb.RFBFactory):
 
     def clientConnectionLost(self, connector, reason):
         log.msg("connection lost: %r" % reason.getErrorMessage())
-        reactor.stop()
+        try:
+            reactor.stop()
+        except error.ReactorNotRunning:
+            pass
 
     def clientConnectionFailed(self, connector, reason):
         log.msg("cannot connect to server: %r\n" % reason.getErrorMessage())
-        reactor.stop()
+        try:
+            reactor.stop()
+        except error.ReactorNotRunning:
+            pass
 
 
 class Options(usage.Options):
