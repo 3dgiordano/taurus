@@ -30,7 +30,7 @@ from bzt.modules.functional import FunctionalAggregator, FunctionalAggregatorLis
 from bzt.modules.passfail import PassFailStatus
 from bzt.six import etree, iteritems, string_types
 from bzt.utils import get_full_path
-
+from terminaltables import AsciiTable
 
 class FinalStatus(Reporter, AggregatorListener, FunctionalAggregatorListener):
     """
@@ -97,6 +97,9 @@ class FinalStatus(Reporter, AggregatorListener, FunctionalAggregatorListener):
 
             if self.parameters.get("failed-labels", False):
                 self.__report_failed_labels(self.last_sec[DataPoint.CUMULATIVE])
+
+            if self.parameters.get("summary-labels", False):
+                self.__report_summary_labels(self.last_sec[DataPoint.CUMULATIVE])
 
             if self.parameters.get("dump-xml", None):
                 self.__dump_xml(self.parameters.get("dump-xml"))
@@ -173,6 +176,85 @@ class FinalStatus(Reporter, AggregatorListener, FunctionalAggregatorListener):
                 failed_samples_count = cumulative[sample_label]['fail']
                 if failed_samples_count:
                     self.log.info(report_template, failed_samples_count, sample_label)
+
+    def __get_table(self, header, data, title=""):
+        table_headers = header["headers"]
+        table_headers_desc = header["descriptions"]
+        table_data = []
+
+        table_header = []
+        header_index = 0
+        justify_columns = {}
+        for header in table_headers:
+            table_header.append(table_headers_desc[header].split(":")[0])
+            justify_columns[header_index] = table_headers_desc[header].split(":")[1]
+            header_index += 1
+        table_data.append(table_header)
+
+        for element in data:
+            table_item = []
+            for header in table_headers:
+                table_item.append(element[header])
+            table_data.append(table_item)
+
+        table_instance = AsciiTable(table_data, title)
+
+        table_instance.justify_columns = justify_columns
+
+        return table_instance.table.splitlines()
+
+    def __report_summary_labels(self, cumulative):
+        """
+        reports failed labels
+        """
+        header = {
+            "headers": ["scenario", "label", "status", "succ", "avg_rt", "error"],
+            "descriptions": {"scenario": "scenario:left", "label": "label:left",
+                             "status": "status:center", "succ": "success:center",
+                            "avg_rt": "avg time:center", "error": "error:left"
+                             }
+        }
+        elements = []
+        sorted_labels = sorted(cumulative.keys())
+        last_scenario_name = None
+        for sample_label in sorted_labels:
+            if sample_label != "":
+
+                label_splited = sample_label.split(":")
+                scenario_name = label_splited[0]
+                label_name = label_splited[2]
+
+                # When change scenario add empty line
+                if last_scenario_name and last_scenario_name != scenario_name:
+                    item = {"scenario": "", "label": "", "status": "",
+                            "succ": "" , "error": "",
+                            "avg_rt": ""}
+                    elements.append(item)
+
+                failed_samples_count = cumulative[sample_label]['fail']
+                success_samples_count = cumulative[sample_label]['succ']
+                success_samples = (success_samples_count * 100) / (failed_samples_count + success_samples_count)
+                avg_rt_samples_value = cumulative[sample_label]['avg_rt']
+                result_status = "OK"
+                if failed_samples_count > 0:
+                    result_status = "FAIL"
+
+                item = {"scenario": scenario_name, "label": label_name, "status":result_status,
+                        "succ": str(success_samples) + "%", "error": "",
+                        "avg_rt": str(avg_rt_samples_value)}
+
+                # self.log.info(cumulative[sample_label])
+                errors = []
+                for err_desc in cumulative[sample_label]['errors']:
+                    errors.append(err_desc["msg"])
+                item["error"] = "\n".join(errors)
+
+                elements.append(item)
+                last_scenario_name = scenario_name
+
+        for line in self.__get_table(header, elements):
+            self.log.info(line)
+
 
     def __report_duration(self):
         """
