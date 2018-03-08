@@ -237,6 +237,11 @@ import apiritif
         self.settings = settings
         imports = self.add_imports()
 
+        scenario_name = dict(self.execution).get("scenario", "")
+        service_id = dict(self.execution).get("service_id", None)
+        if service_id:
+            scenario_name = scenario_name + "[" + service_id + "]"
+
         test_class = self.gen_class_definition("TestRequests", ["unittest.TestCase"])
         test_class.append(self.gen_setup_method())
         test_class.append(self.gen_teardown_method())
@@ -246,6 +251,7 @@ import apiritif
         test_method = self.gen_test_method('test_requests')
         self.gen_setup(test_method)
 
+        req_index = 0
         for req in requests:
             if req.label:
                 label = req.label
@@ -253,6 +259,8 @@ import apiritif
                 label = req.url
             else:
                 raise TaurusConfigError("You must specify at least 'url' or 'label' for each requests item")
+
+            label = scenario_name + ":" + str(req_index).zfill(3) + ":" + label
 
             test_method.append(self.gen_statement('with apiritif.transaction(%r):' % label, indent=8))
             transaction_contents = []
@@ -292,6 +300,8 @@ import apiritif
             if think_time is not None:
                 test_method.append(self.gen_statement("sleep(%s)" % dehumanize_time(think_time)))
                 test_method.append(self.gen_new_line(indent=0))
+
+            req_index += 1
 
         test_class.append(test_method)
 

@@ -132,21 +132,23 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         service_remote = self.execution.get_noset("remote", self.settings.get_noset("remote", None))
         service_capabilities = self.execution.get_noset("capabilities", self.settings.get_noset("capabilities", []))
         use_service = self.execution.get_noset("service", self.settings.get_noset("service", None))
+        service_id = None
         if use_service:
             service_info = ServiceAttached.get_remote(self.log).pull_service(use_service,
                                                                              ServiceAttached.get_attached(), cache=True)
-
+            service_id = service_info["service_id"]
             if service_info["remote"]:
                 ServiceAttached.add_attach(service_info["attach_id"])
                 service_remote = service_info["remote"]
                 service_capabilities = service_info["capabilities"]
             if service_info["vnc"] and self.settings.get_noset("service_vnc", True):
+
                 vnc_host = service_info["vnc"].split(":")[0]
                 vnc_port = int(service_info["vnc"].split(":")[1])
                 vnc_pass = "secret"
 
                 vnc_proc = Process(target=run_vncviewer, args=(vnc_host, vnc_port, vnc_pass,
-                                                                service_info["service_id"],))
+                                                                service_id,))
                 vnc_proc.daemon = True
                 vnc_proc.start()
                 self.vnc_connections.append(vnc_proc)
@@ -156,6 +158,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         self.runner.execution = copy.deepcopy(self.execution)
 
         # Promote the resolution
+        self.runner.execution["service_id"] = service_id
         self.runner.execution["remote"] = service_remote
         self.runner.execution["capabilities"] = service_capabilities
 
