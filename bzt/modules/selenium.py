@@ -31,6 +31,9 @@ from bzt.commands import Commands
 from bzt.resources.vnc_viewer.vncviewer import VncViewer
 from multiprocessing import Process
 import multiprocessing as mp
+import requests
+import shutil
+
 try:
     mp.set_start_method('spawn', force=True)
 except AttributeError:
@@ -133,6 +136,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         service_capabilities = self.execution.get_noset("capabilities", self.settings.get_noset("capabilities", []))
         use_service = self.execution.get_noset("service", self.settings.get_noset("service", None))
         service_id = None
+        service_vnc = None
         if use_service:
             service_info = ServiceAttached.get_remote(self.log).pull_service(use_service,
                                                                              ServiceAttached.get_attached(), cache=True)
@@ -141,17 +145,9 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
                 ServiceAttached.add_attach(service_info["attach_id"])
                 service_remote = service_info["remote"]
                 service_capabilities = service_info["capabilities"]
+
             if service_info["vnc"] and self.settings.get_noset("service_vnc", True):
-
-                vnc_host = service_info["vnc"].split(":")[0]
-                vnc_port = int(service_info["vnc"].split(":")[1])
-                vnc_pass = "secret"
-
-                vnc_proc = Process(target=run_vncviewer, args=(vnc_host, vnc_port, vnc_pass,
-                                                                service_id,))
-                vnc_proc.daemon = True
-                vnc_proc.start()
-                self.vnc_connections.append(vnc_proc)
+                service_vnc = service_info["vnc"]
 
         self.runner.parameters = self.parameters
         self.runner.provisioning = self.provisioning
@@ -161,6 +157,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         self.runner.execution["service_id"] = service_id
         self.runner.execution["remote"] = service_remote
         self.runner.execution["capabilities"] = service_capabilities
+        self.runner.execution["vnc"] = service_vnc
 
         # TODO: For debug, remove
         self.log.info("Service:" + str(use_service))
@@ -324,6 +321,27 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         :return:
         """
         self.start_time = time.time()
+
+        if self.runner.execution["vnc"]:
+            vnc_host = self.runner.execution["vnc"].split(":")[0]
+            vnc_port = int(self.runner.execution["vnc"].split(":")[1])
+            vnc_pass = "secret"
+
+            vnc_proc = Process(target=run_vncviewer, args=(vnc_host, vnc_port, vnc_pass,
+                                                           service_id,))
+            vnc_proc.daemon = True
+            vnc_proc.start()
+            self.vnc_connections.append(vnc_proc)
+
+        if self.runner.execution["remote"]:
+            service_host = self.runner.execution["remote"].split(":")[1]
+            service_url = self.runner.execution["remote"].split(":")[0] + ':' + service_host + \
+                          ':5555/extra/bzt_servlet?command=startTest'
+            response = requests.post(service_url,
+                                     json={"enableVideo": True, "enableScreenshot": True})
+            if response.status_code == 200:
+                self.log.info("Service StartTest")
+
         self.runner.startup()
 
     def check(self):
@@ -341,6 +359,27 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             self.end_time = time.time()
             self.log.debug("Selenium tests ran for %s seconds", self.end_time - self.start_time)
 
+    def service_sync_artifacts(self):
+        self.log.info("Service:" + str(self.runner.execution["service_id"]))
+        self.log.info("Remote:" + str(self.runner.execution["remote"]))
+        self.log.info("Capabilities:" + str(len(self.runner.execution["capabilities"])))
+
+        if self.runner.execution["remote"]:
+            service_host = self.runner.execution["remote"].split(":")[1]
+            service_url = self.runner.execution["remote"].split(":")[0] + ":" + service_host + ":5555/extra/bzt_servlet?command=endTest"
+            response = requests.post(service_url,
+                                     json={})
+
+            if response.status_code == 200:
+                self.log.info("Service EndTest")
+                service_url = self.runner.execution["remote"].split(":")[0] + ":" + service_host + ":5555/extra/bzt_servlet"
+                request = requests.get(service_url, stream=True)
+                self.log.info("Script:" + self.script)
+                base_path_script = '.'.join(self.script.split('.')[:-1])
+                execution_artifacts_file = base_path_script + "-selenium.zip"
+                with open(execution_artifacts_file, 'wb') as f:
+                    shutil.copyfileobj(request.raw, f)
+
     def shutdown(self):
         """
         shutdown test_runner
@@ -351,7 +390,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
 
     def post_process(self):
         self.runner.post_process()
-
+        self.service_sync_artifacts()
         if os.path.exists("geckodriver.log"):
             self.engine.existing_artifact("geckodriver.log", True)
 
@@ -472,4 +511,3 @@ class GeckoDriver(RequiredTool):
             raise ToolError("Unable to find %s after installation!" % self.tool_name)
 
         # TODO: check for compatible browser versions?
-
