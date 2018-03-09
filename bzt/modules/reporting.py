@@ -31,6 +31,7 @@ from bzt.modules.passfail import PassFailStatus
 from bzt.six import etree, iteritems, string_types
 from bzt.utils import get_full_path
 from terminaltables import AsciiTable
+from textwrap import wrap
 
 class FinalStatus(Reporter, AggregatorListener, FunctionalAggregatorListener):
     """
@@ -245,8 +246,9 @@ class FinalStatus(Reporter, AggregatorListener, FunctionalAggregatorListener):
 
                 # self.log.info(cumulative[sample_label])
                 errors = []
+                max_width = 60
                 for err_desc in cumulative[sample_label]['errors']:
-                    errors.append(err_desc["msg"])
+                    errors.append('\n'.join(wrap(err_desc["msg"], max_width)))
                 item["error"] = "\n".join(errors)
 
                 elements.append(item)
