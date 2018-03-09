@@ -328,7 +328,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             vnc_pass = "secret"
 
             vnc_proc = Process(target=run_vncviewer, args=(vnc_host, vnc_port, vnc_pass,
-                                                           service_id,))
+                                                           self.runner.execution["service_id"],))
             vnc_proc.daemon = True
             vnc_proc.start()
             self.vnc_connections.append(vnc_proc)
@@ -337,10 +337,14 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             service_host = self.runner.execution["remote"].split(":")[1]
             service_url = self.runner.execution["remote"].split(":")[0] + ':' + service_host + \
                           ':5555/extra/bzt_servlet?command=startTest'
-            response = requests.post(service_url,
-                                     json={"enableVideo": True, "enableScreenshot": True})
-            if response.status_code == 200:
-                self.log.info("Service StartTest")
+
+            try:
+                response = requests.post(service_url,
+                                         json={"enableVideo": True, "enableScreenshot": True})
+                if response.status_code == 200:
+                    self.log.info("Service StartTest")
+            except requests.exceptions.RequestException as e:
+                self.log.info("Service without StartTest")
 
         self.runner.startup()
 
@@ -367,18 +371,22 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         if self.runner.execution["remote"]:
             service_host = self.runner.execution["remote"].split(":")[1]
             service_url = self.runner.execution["remote"].split(":")[0] + ":" + service_host + ":5555/extra/bzt_servlet?command=endTest"
-            response = requests.post(service_url,
-                                     json={})
 
-            if response.status_code == 200:
-                self.log.info("Service EndTest")
-                service_url = self.runner.execution["remote"].split(":")[0] + ":" + service_host + ":5555/extra/bzt_servlet"
-                request = requests.get(service_url, stream=True)
-                self.log.info("Script:" + self.script)
-                base_path_script = '.'.join(self.script.split('.')[:-1])
-                execution_artifacts_file = base_path_script + "-selenium.zip"
-                with open(execution_artifacts_file, 'wb') as f:
-                    shutil.copyfileobj(request.raw, f)
+            try:
+                response = requests.post(service_url,
+                                         json={})
+
+                if response.status_code == 200:
+                    self.log.info("Service EndTest")
+                    service_url = self.runner.execution["remote"].split(":")[0] + ":" + service_host + ":5555/extra/bzt_servlet"
+                    request = requests.get(service_url, stream=True)
+                    self.log.info("Script:" + self.script)
+                    base_path_script = '.'.join(self.script.split('.')[:-1])
+                    execution_artifacts_file = base_path_script + "-selenium.zip"
+                    with open(execution_artifacts_file, 'wb') as f:
+                        shutil.copyfileobj(request.raw, f)
+            except requests.exceptions.RequestException as e:
+                self.log.info("Service without endTest")
 
     def shutdown(self):
         """
