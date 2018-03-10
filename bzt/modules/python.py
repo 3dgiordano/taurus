@@ -523,8 +523,8 @@ import apiritif
                 return self.gen_statement("Select(%s).%s" % (tpl % (bys[aby], selector), action),
                                           indent=indent)
             elif atype == 'asserttext':
-                # TODO: Why .text doesn't works ? 'value' is the only possible attribute for the type of element?
-                action = "get_attribute('value')"
+                # TODO: Why .text doesn't works ? 'innerText' is the only possible attribute for the type of element?
+                action = "get_attribute('innerText')"
                 return self.gen_statement("self.assertEqual(%s,%r)" % (tpl % (bys[aby], selector, action), param),
                                           indent=indent)
             return self.gen_statement(tpl % (bys[aby], selector, action), indent=indent)
