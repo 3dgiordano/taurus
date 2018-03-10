@@ -222,8 +222,12 @@ class FinalStatus(Reporter, AggregatorListener, FunctionalAggregatorListener):
             if sample_label != "":
 
                 label_splited = sample_label.split(":")
-                scenario_name = label_splited[0]
-                label_name = label_splited[2]
+                if len(label_splited) > 2:
+                    scenario_name = label_splited[0]
+                    label_name = label_splited[2]
+                else:
+                    scenario_name = ""
+                    label_name = sample_label
 
                 # When change scenario add empty line
                 if last_scenario_name and last_scenario_name != scenario_name:
