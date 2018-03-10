@@ -24,7 +24,7 @@ from bzt import TaurusConfigError, ToolError
 from bzt.engine import FileLister, HavingInstallableTools, SelfDiagnosable
 from bzt.modules import ReportableExecutor
 from bzt.modules.console import WidgetProvider, PrioritizedWidget
-from bzt.utils import get_files_recursive, get_full_path, RequiredTool, unzip, untar
+from bzt.utils import get_files_recursive, get_full_path, RequiredTool, unzip, untar, shell_exec
 from bzt.utils import is_windows, is_mac, platform_bitness, Environment
 
 from bzt.commands import Commands
@@ -33,6 +33,7 @@ from multiprocessing import Process
 import multiprocessing as mp
 import requests
 import shutil
+
 
 try:
     mp.set_start_method('spawn', force=True)
@@ -98,11 +99,11 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
     SUPPORTED_RUNNERS = ["nose", "junit", "testng", "rspec", "mocha", "nunit", "pytest", "wdio", "robot"]
 
     CHROMEDRIVER_DOWNLOAD_LINK = "https://chromedriver.storage.googleapis.com/{version}/chromedriver_{arch}.zip"
-    CHROMEDRIVER_VERSION = "2.33"
+    CHROMEDRIVER_VERSION = "2.36"
 
     GECKODRIVER_DOWNLOAD_LINK = "https://github.com/mozilla/geckodriver/releases/download/v{version}/" \
                                 "geckodriver-v{version}-{arch}.{ext}"
-    GECKODRIVER_VERSION = "0.19.0"
+    GECKODRIVER_VERSION = "0.19.1"
 
     SELENIUM_TOOLS_DIR = get_full_path("~/.bzt/selenium-taurus/tools")
 
@@ -327,10 +328,15 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             vnc_port = int(self.runner.execution["vnc"].split(":")[1])
             vnc_pass = "secret"
 
-            vnc_proc = Process(target=run_vncviewer, args=(vnc_host, vnc_port, vnc_pass,
+            if is_mac():
+                cmdline = ["open", "vnc://user:%s@%s:%d" % (vnc_pass, vnc_host, vnc_port)]
+                vnc_proc = shell_exec(cmdline)
+            else:
+                vnc_proc = Process(target=run_vncviewer, args=(vnc_host, vnc_port, vnc_pass,
                                                            self.runner.execution["service_id"],))
-            vnc_proc.daemon = True
-            vnc_proc.start()
+                vnc_proc.daemon = True
+                vnc_proc.start()
+
             self.vnc_connections.append(vnc_proc)
 
         if self.runner.execution["remote"]:
