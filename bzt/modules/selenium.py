@@ -34,7 +34,6 @@ import multiprocessing as mp
 import requests
 import shutil
 
-
 try:
     mp.set_start_method('spawn', force=True)
 except AttributeError:
@@ -333,7 +332,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
                 vnc_proc = shell_exec(cmdline)
             else:
                 vnc_proc = Process(target=run_vncviewer, args=(vnc_host, vnc_port, vnc_pass,
-                                                           self.runner.execution["service_id"],))
+                                                               self.runner.execution["service_id"],))
                 vnc_proc.daemon = True
                 vnc_proc.start()
 
@@ -344,9 +343,11 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             service_url = self.runner.execution["remote"].split(":")[0] + ':' + service_host + \
                           ':5555/extra/bzt_servlet?command=startTest'
 
+            first_connetion_timeout = 3.05  # Slightly larger than 3, default TCP packet retransmission window.
+            first_reponse_timeout = 6
             try:
                 response = requests.post(service_url,
-                                         json={"enableVideo": True, "enableScreenshot": True})
+                                         timeout=(first_connetion_timeout, first_reponse_timeout))
                 if response.status_code == 200:
                     self.log.info("Service StartTest")
             except requests.exceptions.RequestException as e:
@@ -374,18 +375,25 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         self.log.info("Remote:" + str(self.runner.execution["remote"]))
         self.log.info("Capabilities:" + str(len(self.runner.execution["capabilities"])))
 
+        first_connetion_timeout = 3.05  # Slightly larger than 3, default TCP packet retransmission window.
+        first_reponse_timeout = 6
         if self.runner.execution["remote"]:
             service_host = self.runner.execution["remote"].split(":")[1]
-            service_url = self.runner.execution["remote"].split(":")[0] + ":" + service_host + ":5555/extra/bzt_servlet?command=endTest"
+            service_url = self.runner.execution["remote"].split(":")[0] + \
+                          ':' + service_host + \
+                          ':5555/extra/bzt_servlet?command=endTest'
 
             try:
                 response = requests.post(service_url,
-                                         json={})
+                                         json={},
+                                         timeout=(first_connetion_timeout, first_reponse_timeout))
 
                 if response.status_code == 200:
                     self.log.info("Service EndTest")
-                    service_url = self.runner.execution["remote"].split(":")[0] + ":" + service_host + ":5555/extra/bzt_servlet"
-                    request = requests.get(service_url, stream=True)
+                    service_url = self.runner.execution["remote"].split(":")[
+                                      0] + ":" + service_host + ":5555/extra/bzt_servlet"
+                    request = requests.get(service_url, stream=True,
+                                           timeout=(first_connetion_timeout, first_reponse_timeout))
                     self.log.info("Script:" + self.script)
                     base_path_script = '.'.join(self.script.split('.')[:-1])
                     execution_artifacts_file = base_path_script + "-selenium.zip"
