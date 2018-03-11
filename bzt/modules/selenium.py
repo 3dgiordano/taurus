@@ -347,6 +347,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             first_reponse_timeout = 6
             try:
                 response = requests.post(service_url,
+                                         json={"enableVideo": True, "enableScreenshot": True},
                                          timeout=(first_connetion_timeout, first_reponse_timeout))
                 if response.status_code == 200:
                     self.log.info("Service StartTest")
