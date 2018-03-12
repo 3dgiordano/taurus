@@ -135,6 +135,10 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         service_remote = self.execution.get_noset("remote", self.settings.get_noset("remote", None))
         service_capabilities = self.execution.get_noset("capabilities", self.settings.get_noset("capabilities", []))
         use_service = self.execution.get_noset("service", self.settings.get_noset("service", None))
+
+        service_video = self.execution.get_noset("service_video", self.settings.get_noset("service_video", None))
+        service_screenshot = self.execution.get_noset("service_screenshot", self.settings.get_noset("service_screenshot", None))
+
         service_id = None
         service_vnc = None
         if use_service:
@@ -158,6 +162,8 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         self.runner.execution["remote"] = service_remote
         self.runner.execution["capabilities"] = service_capabilities
         self.runner.execution["vnc"] = service_vnc
+        self.runner.execution["video"] = service_video
+        self.runner.execution["screenshot"] = service_screenshot
 
         # TODO: For debug, remove
         self.log.info("Service:" + str(use_service))
@@ -343,11 +349,14 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             service_url = self.runner.execution["remote"].split(":")[0] + ':' + service_host + \
                           ':5555/extra/bzt_servlet?command=startTest'
 
+            video = self.runner.execution.get_noset("video", self.runner.settings.get_noset("video", False))
+            screenshot = self.runner.execution.get_noset("screenshot", self.runner.settings.get_noset("screenshot", False))
+
             first_connetion_timeout = 3.05  # Slightly larger than 3, default TCP packet retransmission window.
             first_reponse_timeout = 6
             try:
                 response = requests.post(service_url,
-                                         json={"enableVideo": True, "enableScreenshot": True},
+                                         json={"enableVideo": video, "enableScreenshot": screenshot},
                                          timeout=(first_connetion_timeout, first_reponse_timeout))
                 if response.status_code == 200:
                     self.log.info("Service StartTest")
