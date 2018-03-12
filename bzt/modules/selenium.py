@@ -136,8 +136,10 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         service_capabilities = self.execution.get_noset("capabilities", self.settings.get_noset("capabilities", []))
         use_service = self.execution.get_noset("service", self.settings.get_noset("service", None))
 
-        service_video = self.execution.get_noset("service_video", self.settings.get_noset("service_video", None))
-        service_screenshot = self.execution.get_noset("service_screenshot", self.settings.get_noset("service_screenshot", None))
+        service_video = self.execution.get_noset("service_video",
+                                                 self.settings.get_noset("service_video", True))
+        service_screenshot = self.execution.get_noset("service_screenshot",
+                                                      self.settings.get_noset("service_screenshot", True))
 
         service_id = None
         service_vnc = None
