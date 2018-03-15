@@ -408,7 +408,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
                                            timeout=(first_connetion_timeout, first_reponse_timeout))
                     self.log.info("Script:" + self.script)
                     base_path_script = '.'.join(self.script.split('.')[:-1])
-                    execution_artifacts_file = base_path_script + "-selenium.zip"
+                    execution_artifacts_file = base_path_script + ".zip"
                     with open(execution_artifacts_file, 'wb') as f:
                         shutil.copyfileobj(request.raw, f)
             except requests.exceptions.RequestException as e:

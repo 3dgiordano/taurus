@@ -75,7 +75,12 @@ class ApiritifNoseExecutor(SubprocessedExecutor):
         self.reporting_setup()  # no prefix/suffix because we don't fully control report file names
 
     def __tests_from_requests(self):
-        filename = self.engine.create_artifact("test_requests", ".py")
+        scenario_name = dict(self.execution).get("scenario", "")
+        service_id = dict(self.execution).get("service_id", None)
+        if service_id:
+            filename = self.engine.create_artifact(scenario_name + "_" + service_id, ".py")
+        else:
+            filename = self.engine.create_artifact("test_requests", ".py")
         test_mode = self.execution.get("test-mode", None) or "apiritif"
         if test_mode == "apiritif":
             builder = ApiritifScriptGenerator(self.get_scenario(), self.log)
