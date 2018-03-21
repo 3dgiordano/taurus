@@ -4,6 +4,7 @@ import random
 import string
 import sys
 import time
+import unittest
  
 import apiritif
  
@@ -13,9 +14,9 @@ log.setLevel(logging.DEBUG)
  
  
 
-class TestAPIRequests:
+class TestAPIRequests(unittest.TestCase):
 
-    def test_requests(self):
+    def test_with_extractors(self):
         target = apiritif.http.target('https://jsonplaceholder.typicode.com')
         target.keep_alive(True)
         target.auto_assert_ok(True)

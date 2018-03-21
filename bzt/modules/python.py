@@ -17,6 +17,7 @@ import ast
 import os
 import re
 import shlex
+import string
 import sys
 import time
 from abc import abstractmethod
@@ -24,6 +25,7 @@ from collections import OrderedDict
 from subprocess import CalledProcessError
 import astunparse
 import yaml
+import json
 
 from bzt import ToolError, TaurusConfigError, TaurusInternalException
 from bzt.engine import HavingInstallableTools, Scenario, SETTINGS
@@ -33,7 +35,7 @@ from bzt.modules.functional import FunctionalResultsReader
 from bzt.modules.jmeter import JTLReader
 from bzt.requests_model import HTTPRequest
 from bzt.six import parse, string_types, iteritems, text_type
-from bzt.utils import BetterDict, ensure_is_dict, shell_exec, FileReader
+from bzt.utils import ensure_is_dict, shell_exec, FileReader
 from bzt.utils import get_full_path, RequiredTool, PythonGenerator, dehumanize_time
 
 IGNORED_LINE = re.compile(r"[^,]+,Total:\d+ Passed:\d+ Failed:\d+")
@@ -41,7 +43,7 @@ IGNORED_LINE = re.compile(r"[^,]+,Total:\d+ Passed:\d+ Failed:\d+")
 
 class ApiritifNoseExecutor(SubprocessedExecutor):
     """
-    :type _readers: list[JTLReader]
+    :type _tailer: FileReader
     """
 
     def __init__(self):
@@ -83,7 +85,8 @@ class ApiritifNoseExecutor(SubprocessedExecutor):
             filename = self.engine.create_artifact("test_requests", ".py")
         test_mode = self.execution.get("test-mode", None) or "apiritif"
         if test_mode == "apiritif":
-            builder = ApiritifScriptGenerator(self.get_scenario(), self.log)
+            scenario = self.get_scenario()
+            builder = ApiritifScriptGenerator(scenario, self.label, self.log)
             builder.verbose = self.__is_verbose()
         else:
             wdlog = self.engine.create_artifact('webdriver', '.log')
@@ -212,7 +215,8 @@ class SeleniumScriptBuilder(PythonGenerator):
     """
     :type window_size: tuple[int,int]
     """
-    IMPORTS = """import unittest
+
+    IMPORTS_SELENIUM = """import unittest
 import re
 from time import sleep
 from selenium import webdriver
@@ -228,10 +232,27 @@ from selenium.webdriver.common.keys import Keys
 import apiritif
 """
 
+    IMPORTS_APPIUM = """import unittest
+import re
+from time import sleep
+from appium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoAlertPresentException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support import expected_conditions as econd
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.common.keys import Keys
+
+import apiritif
+    """
+
     def __init__(self, scenario, parent_logger, wdlog):
         super(SeleniumScriptBuilder, self).__init__(scenario, parent_logger)
         self.window_size = None
         self.wdlog = wdlog
+
         self.execution = None
         self.settings = None
         self.appium = False
@@ -252,7 +273,7 @@ import apiritif
         test_class.append(self.gen_teardown_method())
 
         requests = self.scenario.get_requests(require_url=False)
-        default_address = self.scenario.get("default-address", None)
+        default_address = self.scenario.get("default-address")
         test_method = self.gen_test_method('test_requests')
         self.gen_setup(test_method)
 
@@ -272,7 +293,7 @@ import apiritif
 
             if req.url is not None:
                 parsed_url = parse.urlparse(req.url)
-                if default_address is not None and not parsed_url.netloc:
+                if default_address and not parsed_url.netloc:
                     url = default_address + req.url
                 else:
                     url = req.url
@@ -310,11 +331,20 @@ import apiritif
 
         test_class.append(test_method)
 
-        if self.appium:
-            imports.text = imports.text.replace("from selenium import webdriver", "from appium import webdriver")
+
+        imports = self.add_imports()
 
         self.root.append(imports)
         self.root.append(test_class)
+
+
+    def add_imports(self):
+        imports = super(SeleniumScriptBuilder, self).add_imports()
+        if self.appium:
+            imports.text = self.IMPORTS_APPIUM
+        else:
+            imports.text = self.IMPORTS_SELENIUM
+        return imports
 
     def _add_url_request(self, default_address, req, test_method):
         parsed_url = parse.urlparse(req.url)
@@ -327,9 +357,7 @@ import apiritif
         test_method.append(self.gen_statement("self.driver.get('%s')" % url))
 
     def gen_setup(self, test_method):
-        timeout = self.scenario.get("timeout", None)
-        if timeout is None:
-            timeout = '30s'
+        timeout = self.scenario.get("timeout", "30s")
         scenario_timeout = dehumanize_time(timeout)
         test_method.append(self.gen_impl_wait(scenario_timeout))
         test_method.append(self.gen_new_line(indent=0))
@@ -339,35 +367,40 @@ import apiritif
         inherited_capabilities = []
 
         self.log.debug("Generating setUp test method")
-        browsers = ["Firefox", "Chrome", "Ie", "Opera", "Remote", "Android", "iOS"]
 
-        #browser = self.scenario.get_noset("browser", self.execution.get_noset("browser", None))
-        browser = dict(self.scenario).get("browser", dict(self.execution).get("browser", None))
+        browsers = ["Firefox", "Chrome", "Ie", "Opera", "Remote"]
+        mobile_browsers = ["Chrome", "Safari"]
+        mobile_platforms = ["Android", "iOS"]
+
+        browser = dict(self.scenario).get("browser", None)
         # Split platform: Browser
-
+        browser_platform = None
         if browser:
             browser_split = browser.split("-")
             browser = browser_split[0]
+            if len(browser_split) > 1:
+                browser_platform = browser_split[1]
         if browser and (browser not in browsers):
             raise TaurusConfigError("Unsupported browser name: %s" % browser)
+        headless = False
+        if "headless" in self.scenario:
+            headless = self.scenario.get("headless")
+
+        if headless:
+            self.log.info("Headless mode works only with Selenium 3.8.0+, be sure to have it installed")
 
         setup_method_def = self.gen_method_definition("setUp", ["self"])
 
-        # remote_executor = self.scenario.get_noset("remote", self.execution.get_noset("remote", None))
         remote_executor = dict(self.scenario).get("remote", dict(self.execution).get("remote", None))
         self.log.info("Exec Remote:" + str(remote_executor))
 
         if not browser and remote_executor:
             browser = "Remote"
-        elif browser and browser in ["Android", "iOS"]:
+        elif browser in mobile_browsers and browser_platform in mobile_platforms:
             self.appium = True
-            inherited_capabilities.append({"platform": browser})
-            browser = "Remote"
-            if len(browser_split) > 1 and browser_split[1] in ["Chrome", "Safari"]:
-                inherited_capabilities.append({"browser": browser_split[1]})
-
-            else: # Native
-                inherited_capabilities.append({"browser": ""})
+            inherited_capabilities.append({"platform": browser_platform})
+            inherited_capabilities.append({"browser": browser})
+            browser = "Remote"  # Force to use remote web driver
         elif not browser:
             browser = "Firefox"
 
@@ -377,19 +410,24 @@ import apiritif
             remote_executor = "http://localhost:4723/wd/hub"
 
         if browser == 'Firefox':
+            setup_method_def.append(self.gen_statement("options = webdriver.FirefoxOptions()"))
+            if headless:
+                setup_method_def.append(self.gen_statement("options.set_headless()"))
             setup_method_def.append(self.gen_statement("profile = webdriver.FirefoxProfile()"))
             statement = "profile.set_preference('webdriver.log.file', %s)" % repr(self.wdlog)
             log_set = self.gen_statement(statement)
             setup_method_def.append(log_set)
-            setup_method_def.append(self.gen_statement("self.driver = webdriver.Firefox(profile)"))
+            tmpl = "self.driver = webdriver.Firefox(profile, firefox_options=options)"
+            setup_method_def.append(self.gen_statement(tmpl))
         elif browser == 'Chrome':
-            statement = "self.driver = webdriver.Chrome(service_log_path=%s)"
+            setup_method_def.append(self.gen_statement("options = webdriver.ChromeOptions()"))
+            if headless:
+                setup_method_def.append(self.gen_statement("options.set_headless()"))
+            statement = "self.driver = webdriver.Chrome(service_log_path=%s, chrome_options=options)"
             setup_method_def.append(self.gen_statement(statement % repr(self.wdlog)))
         elif browser == 'Remote':
-
-            # remote_capabilities = self.scenario.get_noset("capabilities", self.execution.get_noset("capabilities", {}))
-            remote_capabilities = dict(self.scenario).get("capabilities", dict(self.execution).get("capabilities", {}))
-            self.log.info(remote_capabilities)
+            remote_capabilities = dict(self.scenario).get("capabilities", dict(self.execution).get("capabilities", []))
+            if not isinstance(remote_capabilities, list): remote_capabilities = [remote_capabilities]
             remote_capabilities = remote_capabilities + inherited_capabilities
 
             supported_capabilities = ["browser", "version", "javascript", "platform", "os_version",
@@ -422,13 +460,13 @@ import apiritif
 
             setup_method_def.append(self.gen_statement(
                 statement.format(command_executor=repr(remote_executor),
-                                 desired_capabilities=repr(desire_capabilities))))
+                                 desired_capabilities=json.dumps(desire_capabilities, sort_keys=True))))
         else:
+            if headless:
+                self.log.warning("Browser %r doesn't support headless mode")
             setup_method_def.append(self.gen_statement("self.driver = webdriver.%s()" % browser))
 
-        scenario_timeout = self.scenario.get("timeout", None)
-        if scenario_timeout is None:
-            scenario_timeout = '30s'
+        scenario_timeout = self.scenario.get("timeout", "30s")
         setup_method_def.append(self.gen_impl_wait(scenario_timeout))
         if self.window_size:  # FIXME: unused in fact
             statement = self.gen_statement("self.driver.set_window_position(0, 0)")
@@ -507,7 +545,9 @@ import apiritif
             'mouseup': "release",
             'mousemove': "move_to_element"
         }
-        if atype in ('click', 'doubleclick', 'mousedown', 'mouseup', 'mousemove', 'keys', 'asserttext', 'select'):
+
+        if atype in ('click', 'doubleclick', 'mousedown', 'mouseup', 'mousemove', 'keys',
+                     'asserttext', 'assertvalue', 'select'):
             tpl = "self.driver.find_element(By.%s, %r).%s"
             action = None
             if atype == 'click':
@@ -527,9 +567,11 @@ import apiritif
                 action = "select_by_visible_text(%r)" % param
                 return self.gen_statement("Select(%s).%s" % (tpl % (bys[aby], selector), action),
                                           indent=indent)
-            elif atype == 'asserttext':
-                # TODO: Why .text doesn't works ? 'innerText' is the only possible attribute for the type of element?
-                action = "get_attribute('innerText')"
+            elif atype.startswith('assert'):
+                if atype == 'asserttext':
+                    action = "get_attribute('innerText')"
+                elif atype == 'assertvalue':
+                    action = "get_attribute('value')"
                 return self.gen_statement("self.assertEqual(%s,%r)" % (tpl % (bys[aby], selector, action), param),
                                           indent=indent)
             return self.gen_statement(tpl % (bys[aby], selector, action), indent=indent)
@@ -559,7 +601,8 @@ import apiritif
         else:
             raise TaurusConfigError("Unsupported value for action: %s" % action_config)
 
-        actions = "click|doubleClick|mouseDown|mouseUp|mouseMove|select|wait|keys|pause|clear|assert|assertText"
+        actions = "|".join(['click', 'doubleClick', 'mouseDown', 'mouseUp', 'mouseMove', 'select', 'wait', 'keys',
+                            'pause', 'clear', 'assert', 'assertText', 'assertValue'])
         bys = "byName|byID|byCSS|byXPath|byLinkText|For|Cookies|Title"
         expr = re.compile("^(%s)(%s)\((.*)\)$" % (actions, bys), re.IGNORECASE)
         res = expr.match(name)
@@ -582,9 +625,10 @@ import apiritif
 class ApiritifScriptGenerator(PythonGenerator):
     # Python AST docs: https://greentreesnakes.readthedocs.io/en/latest/
 
-    def __init__(self, scenario, parent_log):
+    def __init__(self, scenario, label, parent_log):
         super(ApiritifScriptGenerator, self).__init__(scenario, parent_log)
         self.scenario = scenario
+        self.label = label
         self.log = parent_log.getChild(self.__class__.__name__)
         self.tree = None
         self.verbose = False
@@ -603,6 +647,7 @@ class ApiritifScriptGenerator(PythonGenerator):
             ast.Import(names=[ast.alias(name='string', asname=None)]),
             ast.Import(names=[ast.alias(name='sys', asname=None)]),
             ast.Import(names=[ast.alias(name='time', asname=None)]),
+            ast.Import(names=[ast.alias(name='unittest', asname=None)]),
             self.gen_empty_line_stmt(),
 
             ast.Import(names=[ast.alias(name='apiritif', asname=None)]),  # or "from apiritif import http, utils"?
@@ -623,7 +668,7 @@ log.setLevel(logging.DEBUG)
     def gen_classdef(self):
         return ast.ClassDef(
             name='TestAPIRequests',
-            bases=[],
+            bases=[ast.Attribute(value=ast.Name(id='unittest', ctx=ast.Load()), attr='TestCase', ctx=ast.Load())],
             body=[self.gen_test_method()],
             keywords=[],
             starargs=None,
@@ -632,8 +677,14 @@ log.setLevel(logging.DEBUG)
         )
 
     def gen_test_method(self):
+        if self.label.startswith('autogenerated'):
+            method_name = 'test_requests'
+        else:
+            allowed = string.digits + string.ascii_letters + '-'
+            label = ''.join(c for c in self.label if c in allowed).replace('-', '_')
+            method_name = "test_" + label
         return ast.FunctionDef(
-            name='test_requests',
+            name=method_name,
             args=ast.arguments(
                 args=[ast.Name(id='self', ctx=ast.Param())],
                 defaults=[],
@@ -708,22 +759,26 @@ log.setLevel(logging.DEBUG)
 
     def _extract_named_args(self, req):
         named_args = OrderedDict()
+
+        no_target = self.__access_method != "target"
         if req.timeout is not None:
             named_args['timeout'] = dehumanize_time(req.timeout)
-        if req.follow_redirects is not None:
-            named_args['allow_redirects'] = req.priority_option('follow-redirects', default=True)
+        elif "timeout" in self.scenario and no_target:
+            named_args['timeout'] = dehumanize_time(self.scenario.get("timeout"))
+
+        follow_redirects = req.priority_option('follow-redirects', None)
+        if follow_redirects is not None:
+            named_args['allow_redirects'] = follow_redirects
 
         headers = {}
-        scenario_headers = self.scenario.get("headers", None)
-        if scenario_headers:
-            headers.update(scenario_headers)
-        if req.headers:
-            headers.update(req.headers)
+        headers.update(self.scenario.get("headers"))
+        headers.update(req.headers)
+
         if headers:
             named_args['headers'] = self.gen_expr(headers)
 
         merged_headers = dict([(key.lower(), value) for key, value in iteritems(headers)])
-        content_type = merged_headers.get('content-type', None)
+        content_type = merged_headers.get("content-type")
 
         if content_type == 'application/json' and isinstance(req.body, (dict, list)):  # json request body
             named_args['json'] = self.gen_expr(req.body)
@@ -860,7 +915,7 @@ log.setLevel(logging.DEBUG)
             assertion = ensure_is_dict(jpath_assertions, idx, "jsonpath")
             exc = TaurusConfigError('JSON Path not found in assertion: %s' % assertion)
             query = assertion.get('jsonpath', exc)
-            expected = assertion.get('expected-value', '') or None
+            expected = assertion.get('expected-value', None)
             method = "assert_not_jsonpath" if assertion.get('invert', False) else "assert_jsonpath"
             stmts.append(ast.Expr(
                 ast.Call(
@@ -907,7 +962,7 @@ log.setLevel(logging.DEBUG)
 
     def _gen_extractors(self, request):
         stmts = []
-        jextractors = request.config.get("extract-jsonpath", BetterDict())
+        jextractors = request.config.get("extract-jsonpath")
         for varname in jextractors:
             cfg = ensure_is_dict(jextractors, varname, "jsonpath")
             stmts.append(ast.Assign(
@@ -925,7 +980,7 @@ log.setLevel(logging.DEBUG)
                 )
             ))
 
-        extractors = request.config.get("extract-regexp", BetterDict())
+        extractors = request.config.get("extract-regexp")
         for varname in extractors:
             cfg = ensure_is_dict(extractors, varname, "regexp")
             # TODO: support non-'body' value of 'subject'
@@ -946,7 +1001,7 @@ log.setLevel(logging.DEBUG)
 
         # TODO: css/jquery extractor?
 
-        xpath_extractors = request.config.get("extract-xpath", BetterDict())
+        xpath_extractors = request.config.get("extract-xpath")
         for varname in xpath_extractors:
             cfg = ensure_is_dict(xpath_extractors, varname, "xpath")
             parser_type = 'html' if cfg.get('use-tolerant-parser', True) else 'xml'
@@ -1009,8 +1064,9 @@ log.setLevel(logging.DEBUG)
     def save(self, filename):
         with open(filename, 'wt') as fds:
             source = astunparse.unparse(self.tree)
-            # because astunparse on Python 2 adds empty parens
-            source = source.replace('class TestAPIRequests()', 'class TestAPIRequests')
+            # because astunparse on Python 2 adds extra comma+space
+            source = source.replace('class TestAPIRequests(unittest.TestCase, )',
+                                    'class TestAPIRequests(unittest.TestCase)')
             fds.write(source)
 
 
@@ -1080,6 +1136,48 @@ class RandomStringFunction(JMeterFunction):
         )
 
 
+class Base64DecodeFunction(JMeterFunction):
+    def __init__(self, compiler):
+        super(Base64DecodeFunction, self).__init__(["text"], compiler)
+
+    def _compile(self, args):
+        if args.get("text") is None:
+            return None
+
+        return ast.Call(
+            func=ast.Attribute(
+                value=ast.Name(id="apiritif", ctx=ast.Load()),
+                attr='base64_decode',
+                ctx=ast.Load(),
+            ),
+            args=[self.compiler.gen_expr(args["text"])],
+            keywords=[],
+            starargs=None,
+            kwargs=None
+        )
+
+
+class Base64EncodeFunction(JMeterFunction):
+    def __init__(self, compiler):
+        super(Base64EncodeFunction, self).__init__(["text"], compiler)
+
+    def _compile(self, args):
+        if args.get("text") is None:
+            return None
+
+        return ast.Call(
+            func=ast.Attribute(
+                value=ast.Name(id="apiritif", ctx=ast.Load()),
+                attr='base64_encode',
+                ctx=ast.Load(),
+            ),
+            args=[self.compiler.gen_expr(args["text"])],
+            keywords=[],
+            starargs=None,
+            kwargs=None
+        )
+
+
 class TimeFunction(JMeterFunction):
     def __init__(self, compiler):
         super(TimeFunction, self).__init__(["format", "varname"], compiler)
@@ -1096,6 +1194,44 @@ class TimeFunction(JMeterFunction):
                 ctx=ast.Load(),
             ),
             args=arguments,
+            keywords=[],
+            starargs=None,
+            kwargs=None
+        )
+
+
+class UrlEncodeFunction(JMeterFunction):
+    def __init__(self, compiler):
+        super(UrlEncodeFunction, self).__init__(["chars"], compiler)
+
+    def _compile(self, args):
+        if "chars" not in args:
+            return None
+        return ast.Call(
+            func=ast.Attribute(
+                value=ast.Name(id="apiritif", ctx=ast.Load()),
+                attr='encode_url',
+                ctx=ast.Load(),
+            ),
+            args=[self.compiler.gen_expr(args["chars"])],
+            keywords=[],
+            starargs=None,
+            kwargs=None
+        )
+
+
+class UuidFunction(JMeterFunction):
+    def __init__(self, compiler):
+        super(UuidFunction, self).__init__([], compiler)
+
+    def _compile(self, args):
+        return ast.Call(
+            func=ast.Attribute(
+                value=ast.Name(id="apiritif", ctx=ast.Load()),
+                attr='uuid',
+                ctx=ast.Load(),
+            ),
+            args=[],
             keywords=[],
             starargs=None,
             kwargs=None
@@ -1148,6 +1284,8 @@ class JMeterExprCompiler(object):
                             values=[self.gen_expr(v) for _, v in items])
         elif isinstance(value, list):
             return ast.List(elts=[self.gen_expr(val) for val in value], ctx=ast.Load())
+        elif isinstance(value, tuple):
+            return ast.Tuple(elts=[self.gen_expr(val) for val in value], ctx=ast.Load())
         elif isinstance(value, ast.AST):
             return value
         else:
@@ -1164,6 +1302,10 @@ class JMeterExprCompiler(object):
             '__time': TimeFunction,
             '__Random': RandomFunction,
             '__RandomString': RandomStringFunction,
+            '__base64Encode': Base64EncodeFunction,
+            '__base64Decode': Base64DecodeFunction,
+            '__urlencode': UrlEncodeFunction,
+            '__UUID': UuidFunction,
         }
         regexp = r"(\w+)\((.*?)\)"
         args_re = r'(?<!\\),'
@@ -1237,7 +1379,6 @@ class PyTestExecutor(SubprocessedExecutor, HavingInstallableTools):
         self.env.add_path({"PYTHONPATH": get_full_path(__file__, step_up=3)})
 
         cmdline = [executable, self.runner_path, '--report-file', self.report_file]
-        cmdline += self._additional_args
 
         load = self.get_load()
         if load.iterations:
@@ -1246,7 +1387,9 @@ class PyTestExecutor(SubprocessedExecutor, HavingInstallableTools):
         if load.hold:
             cmdline += ['-d', str(load.hold)]
 
+        cmdline += self._additional_args
         cmdline += [self.script]
+
         self._start_subprocess(cmdline)
 
         if self.__is_verbose():
@@ -1321,7 +1464,7 @@ class RobotExecutor(SubprocessedExecutor, HavingInstallableTools):
     def startup(self):
         executable = self.settings.get("interpreter", sys.executable)
 
-        self.env.add_path({"PYTHONPATH":  get_full_path(__file__, step_up=3)})
+        self.env.add_path({"PYTHONPATH": get_full_path(__file__, step_up=3)})
 
         cmdline = [executable, self.runner_path, '--report-file', self.report_file]
 

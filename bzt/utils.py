@@ -16,6 +16,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+import codecs
 import copy
 import csv
 import fnmatch
@@ -33,40 +34,49 @@ import shutil
 import signal
 import socket
 import stat
-import subprocess
 import sys
 import tarfile
 import tempfile
 import time
 import webbrowser
 import zipfile
+import ipaddress
+import psutil
+
 from abc import abstractmethod
 from collections import defaultdict, Counter
 from contextlib import contextmanager
 from math import log
-from subprocess import CalledProcessError
-from subprocess import PIPE
+from progressbar import ProgressBar, Percentage, Bar, ETA
+from subprocess import CalledProcessError, PIPE, check_output, STDOUT
+from urwid import BaseScreen
 from webbrowser import GenericBrowser
 
-import ipaddress
-import psutil
-from progressbar import ProgressBar, Percentage, Bar, ETA
-from psutil import Popen
-from urwid import BaseScreen
-
 from bzt import TaurusInternalException, TaurusNetworkError, ToolError
-from bzt.six import string_types, iteritems, binary_type, text_type, b, integer_types, request, file_type, etree, parse
+from bzt.six import stream_decode, file_type, etree, parse
+from bzt.six import string_types, iteritems, binary_type, text_type, b, integer_types, request
+
+CALL_PROBLEMS = (CalledProcessError, OSError)
 
 
-def get_full_path(path, step_up=0):
+def sync_run(args, env=None):
+    output = check_output(args, env=env, stderr=STDOUT)
+    return stream_decode(output).rstrip()
+
+
+def get_full_path(path, default=None, step_up=0):
     """
     Function expands '~' and adds cwd to path if it's not absolute (relative)
     Target doesn't have to exist
 
     :param path:
+    :param default:
     :param step_up:
     :return:
     """
+    if not path:
+        return default
+
     res = os.path.abspath(os.path.expanduser(path))
     for _ in range(step_up):
         res = os.path.dirname(res)
@@ -162,34 +172,13 @@ def dehumanize_time(str_time):
 class BetterDict(defaultdict):
     """
     Wrapper for defaultdict that able to deep merge other dicts into itself
-
-    :param kwargs:
     """
 
-    def __init__(self, **kwargs):
-        super(BetterDict, self).__init__(**kwargs)
-
-    def get_noset(self, key, default=defaultdict):
-        if default == defaultdict:
-            default = BetterDict()
-
-        if isinstance(default, BaseException) and key not in self:
-            raise default
-
-        value = super(BetterDict, self).get(key, default)
-
-        if isinstance(value, string_types):
-            if isinstance(value, str):  # this is a trick for python v2/v3 compatibility
-                return value
-            else:
-                return text_type(value)
-        else:
-            return value
-
-    def get(self, key, default=defaultdict):
+    def get(self, key, default=defaultdict, force_set=False):
         """
         Change get with setdefault
 
+        :param force_set:
         :type key: object
         :type default: object
         :type no_set: boolean
@@ -200,7 +189,10 @@ class BetterDict(defaultdict):
         if isinstance(default, BaseException) and key not in self:
             raise default
 
-        value = self.setdefault(key, default)
+        if force_set:
+            value = self.setdefault(key, default)
+        else:
+            value = defaultdict.get(self, key, default)
 
         if isinstance(value, string_types):
             if isinstance(value, str):  # this is a trick for python v2/v3 compatibility
@@ -236,7 +228,7 @@ class BetterDict(defaultdict):
                 key = key[1:]
 
             if isinstance(val, dict):
-                dst = self.get(key)
+                dst = self.get(key, force_set=True)
                 if isinstance(dst, BetterDict):
                     dst.merge(val)
                 elif isinstance(dst, Counter):
@@ -356,10 +348,11 @@ def shell_exec(args, cwd=None, stdout=PIPE, stderr=PIPE, stdin=PIPE, shell=False
     logging.getLogger(__name__).debug("Executing shell: %s at %s", args, cwd or os.curdir)
 
     if is_windows():
-        return Popen(args, stdout=stdout, stderr=stderr, stdin=stdin, bufsize=0, cwd=cwd, shell=shell, env=env)
+        return psutil.Popen(args, stdout=stdout, stderr=stderr, stdin=stdin,
+                            bufsize=0, cwd=cwd, shell=shell, env=env)
     else:
-        return Popen(args, stdout=stdout, stderr=stderr, stdin=stdin, bufsize=0,
-                     preexec_fn=os.setpgrp, close_fds=True, cwd=cwd, shell=shell, env=env)
+        return psutil.Popen(args, stdout=stdout, stderr=stderr, stdin=stdin,
+                            bufsize=0, preexec_fn=os.setpgrp, close_fds=True, cwd=cwd, shell=shell, env=env)
 
 
 class Environment(object):
@@ -451,6 +444,8 @@ class FileReader(object):
         # it turns all regular file checks off, see is_ready()
         self.name = filename
         self.cp = 'utf-8'  # default code page is utf-8
+        self.decoder = codecs.lookup(self.cp).incrementaldecoder()
+        self.fallback_decoder = codecs.lookup(self.SYS_ENCODING).incrementaldecoder(errors='ignore')
         self.offset = 0
 
     def _readlines(self, hint=None):
@@ -482,14 +477,16 @@ class FileReader(object):
             self.name = self.fds.name
             return True
 
-    def _decode(self, line):
+    def _decode(self, line, last_pass=False):
         try:
-            return line.decode(self.cp)
+            return self.decoder.decode(line, final=last_pass)
         except UnicodeDecodeError:
             self.log.warning("Content encoding of '%s' doesn't match %s", self.name, self.cp)
             self.cp = self.SYS_ENCODING
+            self.decoder = self.fallback_decoder
+            self.decoder.reset()
             self.log.warning("Proposed code page: %s", self.cp)
-            return line.decode(self.cp)
+            return self.decoder.decode(line, final=last_pass)
 
     def get_lines(self, size=-1, last_pass=False):
         if self.is_ready():
@@ -499,7 +496,7 @@ class FileReader(object):
             self.fds.seek(self.offset)
             for line in self._readlines(hint=size):
                 self.offset += len(line)
-                yield self._decode(line)
+                yield self._decode(line, last_pass)
 
     def get_line(self):
         line = ""
@@ -520,7 +517,7 @@ class FileReader(object):
             _bytes = self.fds.read(size)
             self.offset += len(_bytes)
             if decode:
-                return self._decode(_bytes)
+                return self._decode(_bytes, last_pass)
             else:
                 return _bytes
 
@@ -682,15 +679,16 @@ class MultiPartForm(object):
         # return b'\r\n'.join(x.encode() if isinstance(x, str) else x for x in self.__convert_to_list())
 
 
-def to_json(obj):
+def to_json(obj, indent=True):
     """
     Convert object into indented json
 
-    :param obj:
+    :param indent: whether to generate indented JSON
+    :param obj: object to convert
     :return:
     """
     # NOTE: you can set allow_nan=False to fail when serializing NaN/Infinity
-    return json.dumps(obj, indent=True, cls=ComplexEncoder)
+    return json.dumps(obj, indent=indent, cls=ComplexEncoder)
 
 
 class JSONDumpable(object):
@@ -698,6 +696,13 @@ class JSONDumpable(object):
     Marker class for json dumpable classes
     """
     pass
+
+
+class JSONConvertable(object):
+    @abstractmethod
+    def __json__(self):
+        "Convert class instance into JSON-dumpable structure (e.g. dict)"
+        pass
 
 
 class ComplexEncoder(json.JSONEncoder):
@@ -726,6 +731,8 @@ class ComplexEncoder(json.JSONEncoder):
                 else:
                     res[key] = val
             return res
+        elif self.__convertable(obj):
+            return obj.__json__()
         else:
             return None
 
@@ -738,6 +745,9 @@ class ComplexEncoder(json.JSONEncoder):
         """
         dumpable_types = tuple(self.TYPES + (JSONDumpable,))
         return isinstance(obj, dumpable_types)
+
+    def __convertable(self, obj):
+        return isinstance(obj, JSONConvertable)
 
     @classmethod
     def of_basic_type(cls, val):
@@ -981,7 +991,7 @@ class JavaVM(RequiredTool):
         cmd = [self.tool_path, '-version']
         self.log.debug("Trying %s: %s", self.tool_name, cmd)
         try:
-            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            output = sync_run(cmd)
             self.log.debug("%s output: %s", self.tool_name, output)
             return True
         except (CalledProcessError, OSError) as exc:
@@ -1101,7 +1111,7 @@ class Node(RequiredTool):
         for candidate in node_candidates:
             try:
                 self.log.debug("Trying %r", candidate)
-                output = subprocess.check_output([candidate, '--version'], stderr=subprocess.STDOUT)
+                output = sync_run([candidate, '--version'])
                 self.log.debug("%s output: %s", candidate, output)
                 self.executable = candidate
                 return True

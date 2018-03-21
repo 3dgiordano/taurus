@@ -4,13 +4,12 @@ import inspect
 import json
 import logging
 import os
+import sys
 import tempfile
 from io import StringIO
 from logging import Handler
 from random import random
 from unittest.case import TestCase
-
-import sys
 
 from bzt.cli import CLI
 from bzt.engine import SelfDiagnosable
@@ -40,6 +39,7 @@ logging.info("Bootstrapped test")
 def __dir__():
     filename = inspect.getouterframes(inspect.currentframe())[1][1]
     return os.path.dirname(filename)
+
 
 # execute tests regardless of working directory
 root_dir = __dir__() + '/../'
@@ -72,7 +72,7 @@ def random_sample(ts, label='', conc=1):
 
 def random_datapoint(n):
     point = DataPoint(n)
-    overall = point[DataPoint.CURRENT].get('', KPISet())
+    overall = point[DataPoint.CURRENT].get('', KPISet(), force_set=True)
     overall[KPISet.CONCURRENCY] = r(100)
     overall[KPISet.SAMPLE_COUNT] = int(100 * r(1000)) + 1
     overall[KPISet.SUCCESSES] = int(overall[KPISet.SAMPLE_COUNT] * random())
@@ -92,7 +92,7 @@ def random_datapoint(n):
     overall.sum_rt = overall[KPISet.AVG_RESP_TIME] * overall[KPISet.SAMPLE_COUNT]
     overall.sum_cn = overall[KPISet.AVG_CONN_TIME] * overall[KPISet.SAMPLE_COUNT]
     overall.sum_lt = overall[KPISet.AVG_LATENCY] * overall[KPISet.SAMPLE_COUNT]
-    cumul = point[DataPoint.CUMULATIVE].get('', KPISet())
+    cumul = point[DataPoint.CUMULATIVE].get('', KPISet(), force_set=True)
     cumul.merge_kpis(overall)
     cumul.recalculate()
 
@@ -113,6 +113,15 @@ class BZTestCase(TestCase):
     def setUp(self):
         self.captured_logger = None
         self.log_recorder = None
+        self.func_args = []
+        self.func_results = None
+
+    def func_mock(self, *args, **kwargs):
+        self.func_args.append({'args': args, 'kargs': kwargs})
+        if isinstance(self.func_results, list):
+            return self.func_results.pop(0)
+        else:
+            return self.func_results
 
     def sniff_log(self, log):
         self.log_recorder = RecordingHandler()
@@ -136,7 +145,7 @@ class BZTestCase(TestCase):
 
     def assertFilesEqual(self, expected, actual):
         with open(expected) as exp, open(actual) as act:
-            diff = list(difflib.unified_diff(exp.readlines(), act.readlines()))
+            diff = list(difflib.unified_diff(act.readlines(), exp.readlines()))
             if diff:
                 msg = "Failed asserting that two files are equal:\n" + actual + "\nversus\n" + expected + "\nDiff is:\n"
                 raise AssertionError(msg + "".join(diff))
@@ -199,5 +208,3 @@ class RecordingHandler(Handler):
             buff.write(u(str_template % args))
         else:
             buff.write(u(str_template))
-
-

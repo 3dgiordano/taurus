@@ -4,7 +4,7 @@ ENV DBUS_SESSION_BUS_ADDRESS=/dev/null
 
 WORKDIR /tmp
 ADD https://dl-ssl.google.com/linux/linux_signing_key.pub /tmp
-ADD https://deb.nodesource.com/setup_6.x /tmp
+ADD https://deb.nodesource.com/setup_8.x /tmp
 RUN apt-get -y update \
   && apt-get -y install --no-install-recommends software-properties-common \
   && apt-add-repository multiverse \
@@ -14,7 +14,7 @@ RUN apt-get -y update \
   && apt-add-repository ppa:nilarimogard/webupd8 \
   && cat /tmp/linux_signing_key.pub | apt-key add - \
   && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
-  && bash /tmp/setup_6.x \
+  && bash /tmp/setup_8.x \
   && apt-get -y update \
   && apt-get -y install --no-install-recommends \
     mc \
@@ -29,8 +29,6 @@ RUN apt-get -y update \
     libgconf-2-4 \
     libexif12 \
     udev \
-    python-dev \
-    python-pip \
     default-jdk \
     xvfb \
     libyaml-dev \
@@ -47,14 +45,13 @@ RUN apt-get -y update \
     ruby ruby-dev \
     nodejs \
     mono-complete nuget \
-    python3-dev python3-pip \
     net-tools \
-  && pip install --upgrade setuptools pip \
-  && pip install locustio bzt && pip uninstall -y bzt \
-  && pip install robotframework robotframework-seleniumlibrary \
-  && pip3 install --upgrade setuptools wheel \
+  && apt-get -y install --no-install-recommends python-dev python-pip \
+  && pip install --upgrade pip setuptools wheel \
+  && apt-get -y install --no-install-recommends python3-dev python3-pip \
+  && pip3 install --upgrade setuptools pip wheel \
+  && pip2 install locustio robotframework robotframework-seleniumlibrary \
   && pip3 install molotov \
-  && npm install -g mocha \
   && gem install rspec \
   && gem install selenium-webdriver \
   && wget https://s3.amazonaws.com/deployment.blazemeter.com/jobs/taurus-pbench/10/blazemeter-pbench-extras_0.1.10.1_amd64.deb \
@@ -71,16 +68,14 @@ COPY . /tmp/bzt-src
 WORKDIR /tmp/bzt-src
 RUN google-chrome-stable --version && firefox --version && mono --version && nuget | head -1 \
   && ./build-sdist.sh \
-  && pip install dist/bzt-*.tar.gz \
+  && pip2 install dist/bzt-*.tar.gz \
   && echo '{"install-id": "Docker"}' > /etc/bzt.d/99-zinstallID.json \
   && echo '{"settings": {"artifacts-dir": "/tmp/artifacts"}}' > /etc/bzt.d/90-artifacts-dir.json \
   && bzt -install-tools -v && ls -la /tmp && cat /tmp/jpgc-*.log && ls -la ~/.bzt/jmeter-taurus/*/lib/ext && ls -la ~/.bzt/jmeter-taurus/*/lib/ext/jmeter-plugins-tst-*.jar
 
 RUN bzt /tmp/bzt-src/examples/all-executors.yml -o settings.artifacts-dir=/tmp/all-executors-artifacts -sequential || (\
   ls -lh /tmp/all-executors-artifacts; \
-  cat /tmp/all-executors-artifacts/nose-0.err; \
-  cat /tmp/all-executors-artifacts/geckodriver.log; \
-  cat /tmp/all-executors-artifacts/processlist.txt; \
+  (ls /tmp/all-executors-artifacts/{geckodriver.log,*.out,*.err,processlist.txt} | sort | xargs tail -vn +1); \
   exit 1)
 
 RUN mkdir /bzt-configs \

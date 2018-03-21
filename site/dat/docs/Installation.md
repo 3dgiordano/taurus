@@ -25,7 +25,7 @@ After installation is finished, you can run Taurus with `bzt` from command promp
 
 ####  Install Taurus System Dependencies
 
-1. Get Python 2.7 from [http://www.python.org/downloads](http://www.python.org/downloads) and install it, don't forget to enable "Add python.exe to Path" checkbox.
+1. Get Python 2.7 or 3.5+ from [http://www.python.org/downloads](http://www.python.org/downloads) and install it, don't forget to enable "Add python.exe to Path" checkbox.
 1. Get latest Java from [https://www.java.com/download/](https://www.java.com/download/) and install it.
 
 #### Install Taurus Python Dependencies
@@ -33,40 +33,23 @@ After installation is finished, you can run Taurus with `bzt` from command promp
 Open Command Prompt with administrative privileges (find `Command Prompt` in main menu and chose `Run as administrator`
 from context menu). Then run the following command to update Python package manager to the latest version:
 ```
-pip install --upgrade pip
+pip install --upgrade pip wheel
 ```
 
-##### Install `lxml` Package
-
-```
-pip install lxml
-```
-
-If this command fails, you can install `lxml` with Windows installer provided at project's
-[PyPI page](https://pypi.python.org/pypi/lxml/3.6.0). Just download `lxml-3.6.0.win32-py2.7.exe` installer (or
-`lxml-3.6.0.win-amd64-py2.7.exe`, if you've installed 64-bit Python) and run it.
-
-##### Install `psutil` Package
-
-```
-pip install psutil
-```
-
-If this command fails, you can install `psutil` with Windows installer provided at project's
-[PyPI page](https://pypi.python.org/pypi/psutil). Download `psutil-4.2.0.win32-py2.7.exe` file (or
-`psutil-4.2.0.win-amd64-py2.7.exe` for 64-bit Python) and install it.
-
-##### Install Taurus
+#### Install Taurus
 
 ```
 pip install bzt
 ```
 
+This should install all Taurus dependencies and Taurus itself. You may have to execute this command as an administrator,
+if that's how your Python installation handles Python packages.
+
 ### Upgrading Taurus
 
 To upgrade Taurus, open Command Prompt as administrator and run
 ``` 
- pip install --upgrade bzt
+pip install --upgrade bzt
 ```
 
 ----
@@ -209,7 +192,7 @@ Taurus has [Docker image](https://hub.docker.com/r/blazemeter/taurus/) that allo
 To use it, create a directory, for example `/tmp/my-test`, put all configs and additional files like JMXses there, then start Docker like this:
 
 ```bash
-sudo docker run -i --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus my-config.yml
+sudo docker run -it --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus my-config.yml
 ```
 
 Make note that `/tmp/my-test` was passed in `-v` Docker option, it's crucial. Here's [what happens](https://github.com/Blazemeter/taurus/blob/master/Dockerfile) inside the container:
@@ -220,9 +203,9 @@ Make note that `/tmp/my-test` was passed in `-v` Docker option, it's crucial. He
 You can also specify multile config files in the `docker run` command with wildcards or as separate arguments like so:
 
 ```bash
-sudo docker run -i --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus *.yml
+sudo docker run -it --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus *.yml
 
-sudo docker run -i --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus my-config-1.json my-config-2.json
+sudo docker run -it --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus my-config-1.json my-config-2.json
 ```
 
 ### Additional Taurus Command-Line Options
@@ -230,7 +213,7 @@ sudo docker run -i --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus my-config
 You can still pass [command-line options](https://github.com/Blazemeter/taurus/blob/master/site/dat/docs/CommandLine.md) to Taurus through the Docker image. To do so, add the command line option at the end of the `docker run` command like so:
 
 ```bash
-sudo docker run -i --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus my-config-1.yml -o scenarios.sample.data-sources.0=data.csv
+sudo docker run -it --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus my-config-1.yml -o scenarios.sample.data-sources.0=data.csv
 ```
 
 
@@ -238,5 +221,5 @@ sudo docker run -i --rm -v /tmp/my-test:/bzt-configs blazemeter/taurus my-config
 If you want to receive Taurus artifacts from container, just mount some directory as `/tmp/artifacts` and files will get there. Following example gives you artifacts in `/tmp/my-run-artifacts` directory.
 
 ```bash
-sudo docker run -i --rm -v /tmp:/bzt-configs -v /tmp/my-run-artifacts:/tmp/artifacts blazemeter/taurus
+sudo docker run -it --rm -v /tmp:/bzt-configs -v /tmp/my-run-artifacts:/tmp/artifacts blazemeter/taurus
 ```

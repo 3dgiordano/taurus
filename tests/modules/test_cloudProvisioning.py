@@ -12,7 +12,8 @@ from bzt.bza import Master, Test, MultiTest
 from bzt.engine import ScenarioExecutor, Service
 from bzt.modules import FunctionalAggregator
 from bzt.modules.aggregator import ConsolidatingAggregator, DataPoint, KPISet
-from bzt.modules.blazemeter import CloudProvisioning, ResultsFromBZA, ServiceStubCaptureHAR, FunctionalBZAReader
+from bzt.modules.blazemeter import CloudProvisioning, ResultsFromBZA, ServiceStubCaptureHAR, FunctionalBZAReader, \
+    FUNC_TEST_TYPE
 from bzt.modules.blazemeter import CloudTaurusTest, CloudCollectionTest
 from bzt.utils import get_full_path
 from tests import BZTestCase, RESOURCES_DIR, BASE_CONFIG
@@ -148,9 +149,9 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.settings["detach"] = True
 
         self.obj.prepare()
-        self.assertEqual(14, len(self.mock.requests))
-        self.obj.startup()
         self.assertEqual(15, len(self.mock.requests))
+        self.obj.startup()
+        self.assertEqual(16, len(self.mock.requests))
         self.obj.check()
         self.obj.shutdown()
         self.obj.post_process()
@@ -264,7 +265,7 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.prepare()
         self.obj.log.info("Made requests: %s", self.mock.requests)
         self.assertEquals('https://a.blazemeter.com/api/v4/web/elfinder/1?cmd=rm&targets[]=hash1&targets[]=hash1',
-                          self.mock.requests[12]['url'])
+                          self.mock.requests[13]['url'])
 
     def test_cloud_config_cleanup(self):
         self.configure(
@@ -297,8 +298,8 @@ class TestCloudProvisioning(BZTestCase):
             add_settings=False,
             engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}},
             get={
-                'https://a.blazemeter.com/api/v4/projects?projectId=1&limit=99999': {'result': [{'id': 1,
-                                                                                                 'workspaceId': 1}]},
+                'https://a.blazemeter.com/api/v4/projects?projectId=1': {'result': [{'id': 1,
+                                                                                     'workspaceId': 1}]},
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=1&name=Taurus+Cloud+Test': {"result": [{
                     "id": 1,
                     "projectId": 1,
@@ -324,8 +325,8 @@ class TestCloudProvisioning(BZTestCase):
             add_settings=False,
             engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}},
             get={
-                'https://a.blazemeter.com/api/v4/projects?workspaceId=1&limit=99999': {'result': [{'id': 1,
-                                                                                                   'workspaceId': 1}]},
+                'https://a.blazemeter.com/api/v4/projects?workspaceId=1': {'result': [{'id': 1,
+                                                                                       'workspaceId': 1}]},
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=1&name=Taurus+Cloud+Test': {"result": [{
                     "id": 1,
                     "projectId": 1,
@@ -393,15 +394,15 @@ class TestCloudProvisioning(BZTestCase):
         self.configure(engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}}, )
         self.obj.settings.merge({"delete-test-files": False, "project": "myproject"})
         self.obj.prepare()
-        self.assertEquals('https://a.blazemeter.com/api/v4/projects', self.mock.requests[5]['url'])
-        self.assertEquals('POST', self.mock.requests[5]['method'])
+        self.assertEquals('https://a.blazemeter.com/api/v4/projects', self.mock.requests[6]['url'])
+        self.assertEquals('POST', self.mock.requests[6]['method'])
 
     def test_create_project_test_exists(self):
         self.configure(engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}}, get={
             'https://a.blazemeter.com/api/v4/tests?workspaceId=1&name=Taurus+Cloud+Test': {"result": [
                 {"id": 1, 'projectId': 1, 'name': 'Taurus Cloud Test', 'configuration': {'type': 'taurus'}}
             ]},
-            'https://a.blazemeter.com/api/v4/projects?workspaceId=1&limit=99999': [
+            'https://a.blazemeter.com/api/v4/projects?workspaceId=1': [
                 {'result': []},
                 {'result': [{'id': 1}]}
             ],
@@ -410,11 +411,10 @@ class TestCloudProvisioning(BZTestCase):
         })
         self.obj.settings.merge({"delete-test-files": False, "project": "myproject"})
         self.obj.prepare()
-        self.assertEquals('https://a.blazemeter.com/api/v4/projects', self.mock.requests[5]['url'])
-        self.assertEquals('POST', self.mock.requests[5]['method'])
-        self.assertEquals('https://a.blazemeter.com/api/v4/tests',
-                          self.mock.requests[9]['url'])
-        self.assertEquals('POST', self.mock.requests[9]['method'])
+        self.assertEquals('https://a.blazemeter.com/api/v4/projects', self.mock.requests[6]['url'])
+        self.assertEquals('POST', self.mock.requests[6]['method'])
+        self.assertEquals('https://a.blazemeter.com/api/v4/tests', self.mock.requests[10]['url'])
+        self.assertEquals('POST', self.mock.requests[10]['method'])
 
     def test_reuse_project(self):
         self.obj.user.token = object()
@@ -422,7 +422,7 @@ class TestCloudProvisioning(BZTestCase):
             add_settings=False,
             engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}},
             get={
-                "https://a.blazemeter.com/api/v4/projects?workspaceId=1&limit=99999": {
+                "https://a.blazemeter.com/api/v4/projects?workspaceId=1": {
                     "result": [{"id": 1, "name": "myproject"}]},
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=1&name=Taurus+Cloud+Test': {"result": [{
                     "id": 1,
@@ -443,7 +443,7 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.settings.merge({"delete-test-files": False, "project": "myproject"})
         self.obj.prepare()
         self.assertEquals('https://a.blazemeter.com/api/v4/multi-tests?projectId=1&name=Taurus+Cloud+Test',
-                          self.mock.requests[5]['url'])
+                          self.mock.requests[7]['url'])
 
     def test_reuse_project_id(self):
         self.obj.user.token = object()
@@ -451,7 +451,7 @@ class TestCloudProvisioning(BZTestCase):
             add_settings=False,
             engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}},
             get={
-                "https://a.blazemeter.com/api/v4/projects?workspaceId=1&limit=99999": {
+                "https://a.blazemeter.com/api/v4/projects?workspaceId=1": {
                     "result": [{"id": 1, "name": "myproject"}]},
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=1&name=Taurus+Cloud+Test': {
                     "result": [{"id": 1, "name": "Taurus Cloud Test"}]
@@ -745,8 +745,8 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.settings["check-interval"] = "0ms"  # do not skip checks
         self.obj.settings["use-deprecated-api"] = False
         cls = ServiceStubCaptureHAR.__module__ + "." + ServiceStubCaptureHAR.__name__
-        self.obj.engine.config.get("modules").get('capturehar')['class'] = cls
-        self.obj.engine.config.get(Service.SERV, []).append('capturehar')
+        self.obj.engine.config.get("modules", force_set=True).get("capturehar", force_set=True)["class"] = cls
+        self.obj.engine.config.get(Service.SERV, [], force_set=True).append("capturehar")
 
         self.sniff_log(self.obj.log)
         self.obj.prepare()
@@ -755,7 +755,7 @@ class TestCloudProvisioning(BZTestCase):
         self.assertTrue(self.obj.check())
         self.obj.shutdown()
         self.obj.post_process()
-        self.assertEqual(21, len(self.mock.requests))
+        self.assertEqual(22, len(self.mock.requests))
         self.assertIn("Cloud test has probably failed with message: msg", self.log_recorder.warn_buff.getvalue())
 
     def test_cloud_paths(self):
@@ -836,7 +836,7 @@ class TestCloudProvisioning(BZTestCase):
 
             self.assertTrue(archive_found)
 
-            self.assertEqual(set(new_names), {  # source:
+            target_names = {  # source:
                 'dummy.jmx',  # execution 0 (script)
                 'test_CLI.py', 'file-in-home-02.res',  # 0 (files)
                 'jmeter-loader.bat', 'mocks.py',  # 0 (files)
@@ -878,7 +878,8 @@ class TestCloudProvisioning(BZTestCase):
                 'file-in-home-18.rb',  # 25 (sript)
                 'file-in-home-19.jar',  # global testng settings (additional-classpath)
                 'variable_file_upload.jmx',
-            })
+            }
+            self.assertEqual(set(new_names), target_names)
         finally:
             os.environ['HOME'] = back_home
             shutil.rmtree(temp_home)
@@ -1016,7 +1017,7 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.results_reader.min_ts = 0  # to make it request same URL
         self.obj.engine.aggregator.check()
 
-        self.assertEqual(27, len(self.mock.requests))
+        self.assertEqual(28, len(self.mock.requests))
 
     def test_dump_locations(self):
         self.configure()
@@ -1085,7 +1086,7 @@ class TestCloudProvisioning(BZTestCase):
         self.assertEqual(self.obj.browser_open, "both")
         self.assertEqual(self.obj.user.token, "bmtoken")
         self.assertEqual(self.obj.check_interval, 20.0)
-        self.assertEqual(14, len(self.mock.requests))
+        self.assertEqual(15, len(self.mock.requests))
 
     def test_public_report(self):
         self.configure(
@@ -1126,7 +1127,7 @@ class TestCloudProvisioning(BZTestCase):
             'https://a.blazemeter.com/api/v4/tests?workspaceId=1&name=Taurus+Cloud+Test': {"result": [
                 {"id": 1, 'projectId': 1, 'name': 'Taurus Cloud Test', 'configuration': {'type': 'taurus'}}
             ]},
-            'https://a.blazemeter.com/api/v4/projects?workspaceId=1&limit=99999': [
+            'https://a.blazemeter.com/api/v4/projects?workspaceId=1': [
                 {'result': []},
                 {'result': [{'id': 1}]}
             ],
@@ -1139,13 +1140,10 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.prepare()
         self.obj.startup()
         reqs = self.mock.requests
-        self.assertEqual(reqs[12]['url'], 'https://a.blazemeter.com/api/v4/tests/1')
-        self.assertEqual(reqs[12]['method'], 'PATCH')
-        data = json.loads(reqs[12]['data'])
-        plugins = data['configuration']['plugins']
-        self.assertEqual(plugins["functionalExecution"], {"enabled": True})
-        start_req = reqs[-1]
-        self.assertTrue(start_req['url'].endswith('?functionalExecution=true'))
+        self.assertEqual(reqs[10]['url'], 'https://a.blazemeter.com/api/v4/tests')
+        self.assertEqual(reqs[10]['method'], 'POST')
+        data = json.loads(reqs[10]['data'])
+        self.assertEqual(data['configuration']['type'], FUNC_TEST_TYPE)
 
     def test_functional_cloud_failed_shutdown(self):
         self.obj.engine.aggregator = FunctionalAggregator()
@@ -1154,7 +1152,7 @@ class TestCloudProvisioning(BZTestCase):
             'https://a.blazemeter.com/api/v4/tests?workspaceId=1&name=Taurus+Cloud+Test': {"result": [
                 {"id": 1, 'projectId': 1, 'name': 'Taurus Cloud Test', 'configuration': {'type': 'taurus'}}
             ]},
-            'https://a.blazemeter.com/api/v4/projects?workspaceId=1&limit=99999': [
+            'https://a.blazemeter.com/api/v4/projects?workspaceId=1': [
                 {'result': []},
                 {'result': [{'id': 1}]}
             ],
@@ -1188,9 +1186,9 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.settings["launch-existing-test"] = True
 
         self.obj.prepare()
-        self.assertEqual(9, len(self.mock.requests))
-        self.obj.startup()
         self.assertEqual(10, len(self.mock.requests))
+        self.obj.startup()
+        self.assertEqual(11, len(self.mock.requests))
 
     def test_launch_existing_test_by_id(self):
         self.configure(
@@ -1206,9 +1204,9 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.settings["launch-existing-test"] = True
 
         self.obj.prepare()
-        self.assertEqual(9, len(self.mock.requests))
-        self.obj.startup()
         self.assertEqual(10, len(self.mock.requests))
+        self.obj.startup()
+        self.assertEqual(11, len(self.mock.requests))
 
     def test_launch_existing_test_not_found_by_id(self):
         self.configure(
@@ -1252,9 +1250,9 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.settings["launch-existing-test"] = True
 
         self.obj.prepare()
-        self.assertEqual(8, len(self.mock.requests))
-        self.obj.startup()
         self.assertEqual(9, len(self.mock.requests))
+        self.obj.startup()
+        self.assertEqual(10, len(self.mock.requests))
 
     def test_launch_existing_test_non_taurus(self):
         self.configure(
@@ -1269,9 +1267,9 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.settings["test"] = "foo"
 
         self.obj.prepare()
-        self.assertEqual(9, len(self.mock.requests))
-        self.obj.startup()
         self.assertEqual(10, len(self.mock.requests))
+        self.obj.startup()
+        self.assertEqual(11, len(self.mock.requests))
 
     def test_launch_test_by_link(self):
         self.configure(
@@ -1280,7 +1278,7 @@ class TestCloudProvisioning(BZTestCase):
                 'https://a.blazemeter.com/api/v4/workspaces?accountId=1&enabled=true&limit=100': {
                     "result": [{"id": 2, "name": "Wksp name", "enabled": True, "accountId": 1}]
                 },
-                'https://a.blazemeter.com/api/v4/projects?workspaceId=2&limit=99999': {
+                'https://a.blazemeter.com/api/v4/projects?workspaceId=2': {
                     "result": [{"id": 3, "name": "Project name", "workspaceId": 2}]
                 },
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=3&id=4': {"result": []},
@@ -1322,7 +1320,7 @@ class TestCloudProvisioning(BZTestCase):
                     "result": {"id": 2, "name": "Wksp name", "enabled": True, "accountId": 1,
                                "locations": [{"id": "eu-west-1"}]}
                 },
-                'https://a.blazemeter.com/api/v4/projects?workspaceId=2&limit=99999': {
+                'https://a.blazemeter.com/api/v4/projects?workspaceId=2': {
                     "result": [{"id": 3, "name": "Project name", "workspaceId": 2}]
                 },
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=3&id=4': {"result": []},
@@ -1353,18 +1351,16 @@ class TestCloudProvisioning(BZTestCase):
                 'https://a.blazemeter.com/api/v4/workspaces?accountId=1&enabled=true&limit=100': {
                     "result": [{"id": 2, "name": "Wksp name", "enabled": True, "accountId": 1}]
                 },
-                'https://a.blazemeter.com/api/v4/projects?workspaceId=2&limit=99999': {
+                'https://a.blazemeter.com/api/v4/projects?workspaceId=2&name=Project+name': {
                     "result": [{"id": 3, "name": "Project name", "workspaceId": 2}]
                 },
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=3&name=Test+name': {"result": []},
                 'https://a.blazemeter.com/api/v4/tests?projectId=3&name=Test+name': {"result": [
                     {"id": 4, "name": "Test name", "configuration": {"type": "taurus"}}
-                ]},
-            },
+                ]}},
             post={
                 'https://a.blazemeter.com/api/v4/tests/4/start': {"result": {"id": 5}},
-            }
-        )
+            })
 
         self.obj.settings["account"] = "Acc name"
         self.obj.settings["workspace"] = "Wksp name"
@@ -1385,7 +1381,7 @@ class TestCloudProvisioning(BZTestCase):
                 'https://a.blazemeter.com/api/v4/workspaces?accountId=1&enabled=true&limit=100': {
                     "result": [{"id": 2, "name": "Wksp name", "enabled": True, "accountId": 1}]
                 },
-                'https://a.blazemeter.com/api/v4/projects?workspaceId=2&limit=99999': {
+                'https://a.blazemeter.com/api/v4/projects?workspaceId=2': {
                     "result": [{"id": 3, "name": "Project name", "workspaceId": 2}]
                 },
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=3&id=4': {"result": []},
@@ -1421,7 +1417,8 @@ class TestCloudProvisioning(BZTestCase):
                 ]
             },
             get={
-                'https://a.blazemeter.com/api/v4/accounts': {"result": [{"id": 1, "name": "Acc name"}]},
+                'https://a.blazemeter.com/api/v4/accounts': {
+                    "result": [{"id": 1, "name": "Acc name", "owner": {"id": 1}}]},
                 'https://a.blazemeter.com/api/v4/workspaces?accountId=1&enabled=true&limit=100': {
                     "result": [{"id": 2, "name": "Wksp name", "enabled": True, "accountId": 1,
                                 "locations": [{"id": "eu-west-1"}]}]
@@ -1430,7 +1427,7 @@ class TestCloudProvisioning(BZTestCase):
                     "result": {"id": 2, "name": "Wksp name", "enabled": True, "accountId": 1,
                                "locations": [{"id": "eu-west-1"}]}
                 },
-                'https://a.blazemeter.com/api/v4/projects?workspaceId=2&limit=99999': {
+                'https://a.blazemeter.com/api/v4/projects?workspaceId=2': {
                     "result": [{"id": 3, "name": "Project name", "workspaceId": 2}]
                 },
                 'https://a.blazemeter.com/api/v4/multi-tests?projectId=3&name=ExternalTest': {"result": []},
@@ -1448,14 +1445,14 @@ class TestCloudProvisioning(BZTestCase):
 
         self.obj.settings["test"] = "ExternalTest"
         self.obj.prepare()
-        self.assertEqual(13, len(self.mock.requests))
+        self.assertEqual(14, len(self.mock.requests))
 
     def test_send_report_email_default(self):
         self.configure(engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}}, get={
             'https://a.blazemeter.com/api/v4/tests?workspaceId=1&name=Taurus+Cloud+Test': {"result": [
                 {"id": 1, 'projectId': 1, 'name': 'Taurus Cloud Test', 'configuration': {'type': 'taurus'}}
             ]},
-            'https://a.blazemeter.com/api/v4/projects?workspaceId=1&limit=99999': [
+            'https://a.blazemeter.com/api/v4/projects?workspaceId=1': [
                 {'result': []},
                 {'result': [{'id': 1}]}
             ],
@@ -1468,9 +1465,9 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.prepare()
         self.obj.startup()
         reqs = self.mock.requests
-        self.assertEqual(reqs[12]['url'], 'https://a.blazemeter.com/api/v4/tests/1')
-        self.assertEqual(reqs[12]['method'], 'PATCH')
-        data = json.loads(reqs[12]['data'])
+        self.assertEqual(reqs[13]['url'], 'https://a.blazemeter.com/api/v4/tests/1')
+        self.assertEqual(reqs[13]['method'], 'PATCH')
+        data = json.loads(reqs[13]['data'])
         plugins = data['configuration']['plugins']
         self.assertEqual(plugins["reportEmail"], {"enabled": False})
 
@@ -1479,7 +1476,7 @@ class TestCloudProvisioning(BZTestCase):
             'https://a.blazemeter.com/api/v4/tests?workspaceId=1&name=Taurus+Cloud+Test': {"result": [
                 {"id": 1, 'projectId': 1, 'name': 'Taurus Cloud Test', 'configuration': {'type': 'taurus'}}
             ]},
-            'https://a.blazemeter.com/api/v4/projects?workspaceId=1&limit=99999': [
+            'https://a.blazemeter.com/api/v4/projects?workspaceId=1': [
                 {'result': []},
                 {'result': [{'id': 1}]}
             ],
@@ -1492,11 +1489,28 @@ class TestCloudProvisioning(BZTestCase):
         self.obj.prepare()
         self.obj.startup()
         reqs = self.mock.requests
-        self.assertEqual(reqs[12]['url'], 'https://a.blazemeter.com/api/v4/tests/1')
-        self.assertEqual(reqs[12]['method'], 'PATCH')
-        data = json.loads(reqs[12]['data'])
+        self.assertEqual(reqs[13]['url'], 'https://a.blazemeter.com/api/v4/tests/1')
+        self.assertEqual(reqs[13]['method'], 'PATCH')
+        data = json.loads(reqs[13]['data'])
         plugins = data['configuration']['plugins']
         self.assertEqual(plugins["reportEmail"], {"enabled": True})
+
+    def test_multi_account_choice(self):
+        with open(RESOURCES_DIR + "json/blazemeter-api-accounts.json") as fhd:
+            accs = json.loads(fhd.read())
+
+        self.configure(
+            engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}},
+            get={
+                'https://a.blazemeter.com/api/v4/accounts': accs,
+            },
+        )
+
+        self.obj.settings['launch-existing-test'] = False
+        self.obj.prepare()
+        exp = "https://a.blazemeter.com/api/v4/workspaces?accountId=2&enabled=true&limit=100"
+        self.assertEqual(exp, self.mock.requests[6]['url'])
+        self.assertEqual(17, len(self.mock.requests))
 
 
 class TestCloudTaurusTest(BZTestCase):

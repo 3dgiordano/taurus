@@ -267,7 +267,8 @@ class Workspace(BZAObject):
         """
         params = OrderedDict()
         params.update({"workspaceId": self['id']})
-        params.update({"limit": 99999})
+        if name:
+            params.update({"name": name})
         res = self._request(self.address + '/api/v4/projects?' + urlencode(params))
 
         projects = BZAObjectsList()
@@ -511,6 +512,10 @@ class MultiTest(BZAObject):
     def update_collection(self, coll):
         url = self.address + "/api/v4/multi-tests/%s" % self['id']
         self._request(url, data=coll, method="PATCH")
+
+    def delete(self):
+        url = self.address + "/api/v4/multi-tests/%s" % self['id']
+        self._request(url, method="DELETE")
 
 
 class Master(BZAObject):
