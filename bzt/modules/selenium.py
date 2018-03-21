@@ -132,14 +132,14 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
         self.runner.env = self.env
 
         # Propagate to Runner Remote capabilities if is used and generate Environment variables for external script
-        service_remote = self.execution.get_noset("remote", self.settings.get_noset("remote", None))
-        service_capabilities = self.execution.get_noset("capabilities", self.settings.get_noset("capabilities", []))
-        use_service = self.execution.get_noset("service", self.settings.get_noset("service", None))
+        service_remote = self.execution.get("remote", self.settings.get("remote", None))
+        service_capabilities = self.execution.get("capabilities", self.settings.get("capabilities", []))
+        use_service = self.execution.get("service", self.settings.get("service", None))
 
-        service_video = self.execution.get_noset("service_video",
-                                                 self.settings.get_noset("service_video", True))
-        service_screenshot = self.execution.get_noset("service_screenshot",
-                                                      self.settings.get_noset("service_screenshot", True))
+        service_video = self.execution.get("service_video",
+                                                 self.settings.get("service_video", True))
+        service_screenshot = self.execution.get("service_screenshot",
+                                                      self.settings.get("service_screenshot", True))
 
         service_id = None
         service_vnc = None
@@ -152,7 +152,7 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
                 service_remote = service_info["remote"]
                 service_capabilities = service_info["capabilities"]
 
-            if service_info["vnc"] and self.settings.get_noset("service_vnc", True):
+            if service_info["vnc"] and self.settings.get("service_vnc", True):
                 service_vnc = service_info["vnc"]
 
         self.runner.parameters = self.parameters
@@ -351,8 +351,8 @@ class SeleniumExecutor(AbstractSeleniumExecutor, WidgetProvider, FileLister, Hav
             service_url = self.runner.execution["remote"].split(":")[0] + ':' + service_host + \
                           ':5555/extra/bzt_servlet?command=startTest'
 
-            video = self.runner.execution.get_noset("video", self.runner.settings.get_noset("video", False))
-            screenshot = self.runner.execution.get_noset("screenshot", self.runner.settings.get_noset("screenshot", False))
+            video = self.runner.execution.get("video", self.runner.settings.get("video", False))
+            screenshot = self.runner.execution.get("screenshot", self.runner.settings.get("screenshot", False))
 
             first_connetion_timeout = 3.05  # Slightly larger than 3, default TCP packet retransmission window.
             first_reponse_timeout = 6
