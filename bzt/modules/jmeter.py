@@ -59,7 +59,7 @@ class JMeterExecutor(ScenarioExecutor, WidgetProvider, FileLister, HavingInstall
     """
     MIRRORS_SOURCE = "https://jmeter.apache.org/download_jmeter.cgi"
     JMETER_DOWNLOAD_LINK = "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-{version}.zip"
-    PLUGINS_MANAGER_VERSION = "0.19"
+    PLUGINS_MANAGER_VERSION = "0.20"
     PLUGINS_MANAGER = 'https://search.maven.org/remotecontent?filepath=kg/apc/jmeter-plugins-manager/' \
                       '{ver}/jmeter-plugins-manager-{ver}.jar'.format(ver=PLUGINS_MANAGER_VERSION)
     CMDRUNNER = 'https://search.maven.org/remotecontent?filepath=kg/apc/cmdrunner/2.0/cmdrunner-2.0.jar'
@@ -1028,7 +1028,7 @@ class FuncJTLReader(FunctionalResultsReader):
 
     def __read_next_chunk(self, last_pass):
         while not self.failed_processing:
-            read = self.file.get_bytes(size=1024 * 1024)
+            read = self.file.get_bytes(size=1024 * 1024, decode=False)
             if not read or not read.strip():
                 break
 
@@ -1284,7 +1284,8 @@ class JTLErrorsReader(object):
         Read the next part of the file
         """
         while not self.failed_processing:
-            read = self.file.get_bytes(size=1024 * 1024)
+            # we need to feed bytes, not a unicode string, into the parser
+            read = self.file.get_bytes(size=1024 * 1024, decode=False)
             if not read or not read.strip():
                 break
 
