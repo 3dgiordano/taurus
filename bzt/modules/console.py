@@ -21,7 +21,7 @@ import sys
 import time
 import traceback
 from abc import abstractmethod
-from collections import deque
+from collections import deque, OrderedDict
 from datetime import datetime
 from itertools import groupby, islice, chain
 
@@ -812,14 +812,23 @@ class LabelStatsTable(Columns):
         self.labels.flush_data()
         self.stats_table.flush_data()
 
-        overall = data.get(self.key)
+        overall = OrderedDict(sorted(data.get(self.key).items(), key=lambda t: t[0]))
 
         for label in overall:
             if label != "":
+
+                label_splited = label.split(":")
+                if len(label_splited) > 2:
+                    scenario_name = label_splited[0]
+                    label_name = label_splited[2]
+                else:
+                    scenario_name = ""
+                    label_name = label
+
                 hits = overall.get(label).get(KPISet.SAMPLE_COUNT)
                 failed = float(overall.get(label).get(KPISet.FAILURES)) / hits * 100 if hits else 0.0
                 avg_rt = overall.get(label).get(KPISet.AVG_RESP_TIME)
-                self.labels.add_data(label)
+                self.labels.add_data((scenario_name + " " + label_name).strip())
                 self.stats_table.add_data(hits, failed, avg_rt)
 
     def render(self, size, focus=False):
