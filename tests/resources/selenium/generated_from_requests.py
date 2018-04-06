@@ -53,6 +53,6 @@ class TestRequests(unittest.TestCase):
         re_pattern = re.compile(r'contained_text')
         self.assertEqual(0, len(re.findall(re_pattern, body)), "Assertion: 'contained_text' found in BODY")
 
-        with apiritif.transaction('empty'):
+        with apiritif.transaction('loc_sc:001:empty'):
             pass
 
