@@ -79,7 +79,7 @@ class TestCloudProvisioning(BZTestCase):
                         "us-west": 2}}},
 
             get={
-                'https://a.blazemeter.com/api/v4/masters/1/status': {"result": {"id": 1}},
+                'https://a.blazemeter.com/api/v4/masters/1/status': {"result": {"id": 1, "progress": 100}},
                 'https://a.blazemeter.com/api/v4/masters/1/sessions': {"result": []},
                 'https://a.blazemeter.com/api/v4/masters/1/full': {"result": {}},
             },
@@ -107,7 +107,7 @@ class TestCloudProvisioning(BZTestCase):
                         "us-west": 2}}},
 
             get={
-                'https://a.blazemeter.com/api/v4/masters/1/status': {"result": {"id": 1}},
+                'https://a.blazemeter.com/api/v4/masters/1/status': {"result": {"id": 1, "progress": 90}},
                 'https://a.blazemeter.com/api/v4/masters/1/sessions': {"result": []},
                 'https://a.blazemeter.com/api/v4/masters/1/full': {"result": {"sessions": [{
                     "errors": [
@@ -120,6 +120,7 @@ class TestCloudProvisioning(BZTestCase):
                 }]}},
             },
             post={
+                'https://a.blazemeter.com/api/v4/masters/1/terminate': {"result": []},
             }
         )  # terminate
 
@@ -1101,7 +1102,7 @@ class TestCloudProvisioning(BZTestCase):
                 'https://a.blazemeter.com/api/v4/masters/1/public-token': {"result": {"publicToken": "publicToken"}}
             },
             get={
-                'https://a.blazemeter.com/api/v4/masters/1/status': {"result": {"status": "CREATED"}},
+                'https://a.blazemeter.com/api/v4/masters/1/status': {"result": {"status": "CREATED", "progress": 100}},
                 'https://a.blazemeter.com/api/v4/masters/1/sessions': {"result": {"sessions": []}},
                 'https://a.blazemeter.com/api/v4/masters/1/full': {"result": {}},
             }
@@ -1158,7 +1159,7 @@ class TestCloudProvisioning(BZTestCase):
             ],
             'https://a.blazemeter.com/api/v4/multi-tests?projectId=1&name=Taurus+Cloud+Test': {'result': []},
             'https://a.blazemeter.com/api/v4/tests?projectId=1&name=Taurus+Cloud+Test': {'result': []},
-            'https://a.blazemeter.com/api/v4/masters/1/status': {"result": {"id": 1}},
+            'https://a.blazemeter.com/api/v4/masters/1/status': {"result": {"id": 1, "progress": 100}},
             'https://a.blazemeter.com/api/v4/masters/1/sessions': {"result": []},
             'https://a.blazemeter.com/api/v4/masters/1/full': {"result": {"functionalSummary": func_summary}},
         }, post={
@@ -1421,17 +1422,19 @@ class TestCloudProvisioning(BZTestCase):
                     "result": [{"id": 1, "name": "Acc name", "owner": {"id": 1}}]},
                 'https://a.blazemeter.com/api/v4/workspaces?accountId=1&enabled=true&limit=100': {
                     "result": [{"id": 2, "name": "Wksp name", "enabled": True, "accountId": 1,
+                                "locations": [{"id": "eu-west-1"}]},
+                               {"id": 1, "name": "Dflt name", "enabled": True, "accountId": 1,
                                 "locations": [{"id": "eu-west-1"}]}]
                 },
-                'https://a.blazemeter.com/api/v4/workspaces/2': {
-                    "result": {"id": 2, "name": "Wksp name", "enabled": True, "accountId": 1,
+                'https://a.blazemeter.com/api/v4/workspaces/1': {
+                    "result": {"id": 1, "name": "Wksp name", "enabled": True, "accountId": 1,
                                "locations": [{"id": "eu-west-1"}]}
                 },
                 'https://a.blazemeter.com/api/v4/projects?workspaceId=2': {
                     "result": [{"id": 3, "name": "Project name", "workspaceId": 2}]
                 },
-                'https://a.blazemeter.com/api/v4/multi-tests?projectId=3&name=ExternalTest': {"result": []},
-                'https://a.blazemeter.com/api/v4/tests?projectId=3&name=ExternalTest': {"result": [
+                'https://a.blazemeter.com/api/v4/multi-tests?projectId=1&name=ExternalTest': {"result": []},
+                'https://a.blazemeter.com/api/v4/tests?projectId=1&name=ExternalTest': {"result": [
                     {"id": 4, "name": "ExternalTest", "configuration": {"type": "external"}},
                 ]},
             },
@@ -1445,7 +1448,7 @@ class TestCloudProvisioning(BZTestCase):
 
         self.obj.settings["test"] = "ExternalTest"
         self.obj.prepare()
-        self.assertEqual(14, len(self.mock.requests))
+        self.assertEqual(16, len(self.mock.requests))
 
     def test_send_report_email_default(self):
         self.configure(engine_cfg={ScenarioExecutor.EXEC: {"executor": "mock"}}, get={
@@ -1508,9 +1511,9 @@ class TestCloudProvisioning(BZTestCase):
 
         self.obj.settings['launch-existing-test'] = False
         self.obj.prepare()
-        exp = "https://a.blazemeter.com/api/v4/workspaces?accountId=2&enabled=true&limit=100"
+        exp = "https://a.blazemeter.com/api/v4/workspaces?accountId=1&enabled=true&limit=100"
         self.assertEqual(exp, self.mock.requests[6]['url'])
-        self.assertEqual(17, len(self.mock.requests))
+        self.assertEqual(19, len(self.mock.requests))
 
 
 class TestCloudTaurusTest(BZTestCase):

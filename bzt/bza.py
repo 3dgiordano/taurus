@@ -16,6 +16,8 @@ from bzt.six import text_type
 from bzt.six import urlencode
 from bzt.utils import to_json, MultiPartForm
 
+BZA_TEST_DATA_RECEIVED = 100
+
 
 class BZAObject(dict):
     def __init__(self, proto=None, data=None):
@@ -596,6 +598,10 @@ class Master(BZAObject):
 
     def stop(self):
         url = self.address + "/api/v4/masters/%s/stop"
+        self._request(url % self['id'], method='POST')
+
+    def terminate(self):
+        url = self.address + "/api/v4/masters/%s/terminate"
         self._request(url % self['id'], method='POST')
 
     def get_full(self):
