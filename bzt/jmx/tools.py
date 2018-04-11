@@ -570,7 +570,10 @@ class JMeterScenarioBuilder(JMX):
                 raise TaurusConfigError("jsr223 element must specify one of 'script-file' or 'script-text'")
             parameters = jsr.get("parameters", "")
             execute = jsr.get("execute", "after")
-            children.append(JMX._get_jsr223_element(lang, script_file, parameters, execute, script_text))
+            element_type = jsr.get("type", execute)
+            if execute != "after" and element_type != execute:
+                raise TaurusConfigError("jsr223 element must specify one of 'type' or 'execute'")
+            children.append(JMX._get_jsr223_element(lang, script_file, parameters, element_type, script_text))
             children.append(etree.Element("hashTree"))
 
     def _get_merged_ci_headers(self, req, header):

@@ -998,13 +998,19 @@ class JMX(object):
         return element
 
     @staticmethod
-    def _get_jsr223_element(language, script_file, parameters, execute, script_text=None):
-        if execute == "before":
+    def _get_jsr223_element(language, script_file, parameters, element_type, script_text=None):
+        if element_type == "before":
             element = etree.Element("JSR223PreProcessor", guiclass="TestBeanGUI",
                                     testclass="JSR223PreProcessor", testname="JSR223 PreProcessor")
-        else:
+        elif element_type == "after":
             element = etree.Element("JSR223PostProcessor", guiclass="TestBeanGUI",
                                     testclass="JSR223PostProcessor", testname="JSR223 PostProcessor")
+        elif element_type == "sampler":
+            element = etree.Element("JSR223Sampler", guiclass="TestBeanGUI",
+                                    testclass="JSR223Sampler", testname="JSR223 Sampler")
+        elif element_type == "assertion":
+            element = etree.Element("JSR223Assertion", guiclass="TestBeanGUI",
+                                    testclass="JSR223Assertion", testname="JSR223 Assertion")
         element.append(JMX._string_prop("filename", script_file if script_file else ''))
         element.append(JMX._string_prop("script", script_text if script_text else ''))
         element.append(JMX._string_prop("parameters", parameters))
